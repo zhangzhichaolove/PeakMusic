@@ -1,3 +1,12 @@
 <resources>
     <string name="app_name">PeakMusic</string>
+
+    <string name="open">打开</string>
+    <string name="close">关闭</string>
+    <string name="menu_setting">功能设置</string>
+    <string name="menu_night">夜间模式</string>
+    <string name="menu_timer">定时停止</string>
+    <string name="menu_exit">退出应用</string>
+    <string name="menu_about">关于作者</string>
+    <string name="menu_share">推荐朋友</string>
 </resources>

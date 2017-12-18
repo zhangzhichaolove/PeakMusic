@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="CustomToolbar">
+        <attr name="left_icon" format="reference|color" />
+        <attr name="text_title" format="string" />
+        <attr name="right_icon" format="reference|color" />
+        <attr name="android:background" />
+    </declare-styleable>
+
+</resources>
