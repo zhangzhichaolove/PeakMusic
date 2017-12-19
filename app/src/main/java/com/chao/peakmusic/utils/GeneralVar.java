@@ -15,6 +15,10 @@ public class GeneralVar {
         GeneralVar.context = context;
     }
 
+    public static Context getApplication() {
+        return context;
+    }
+
     public static Context getContext() {
         return context;
     }
