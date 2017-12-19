@@ -88,7 +88,8 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         mDrawerLayout.addDrawerListener(mDrawerToggle);
         nv_menu.setNavigationItemSelectedListener(this);
         fl_play_bar.setOnClickListener(this);
-        Intent intent = new Intent(this, TestService.class);
+        Intent intent = new Intent("com.chao.peakmusic.action.MUSIC_SERVICE");
+        intent.setPackage(getPackageName());
         startService(intent);
         bindService(intent, conn, Context.BIND_AUTO_CREATE);
         //AudioWidget audioWidget = new AudioWidget.Builder(mContext).build();
@@ -103,7 +104,6 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
 
         @Override
         public void onServiceDisconnected(ComponentName name) {
-            // TODO Auto-generated method stub
             audioService = null;
         }
 

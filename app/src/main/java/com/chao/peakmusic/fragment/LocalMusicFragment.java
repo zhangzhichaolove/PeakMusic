@@ -1,13 +1,21 @@
 package com.chao.peakmusic.fragment;
 
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.ServiceConnection;
 import android.os.Bundle;
+import android.os.IBinder;
+import android.os.RemoteException;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 
 import com.chao.peakmusic.R;
+import com.chao.peakmusic.TestAidlInterface;
 import com.chao.peakmusic.adapter.LocalMusicAdapter;
 import com.chao.peakmusic.base.BaseFragment;
 import com.chao.peakmusic.model.SongModel;
+import com.chao.peakmusic.service.TestAidlService;
 import com.chao.peakmusic.utils.ScanningUtils;
 
 import java.util.ArrayList;
@@ -51,7 +59,46 @@ public class LocalMusicFragment extends BaseFragment implements ScanningUtils.Sc
             onScanningMusicComplete(ScanningUtils.getInstance(mContext).getMusic());
         }
 
+        Intent intent = new Intent(mContext, TestAidlService.class);
+        //startService(intent);
+        mContext.bindService(intent, conn, Context.BIND_AUTO_CREATE);
+
     }
+
+    @Override
+    public void initListener() {
+        adapter.setListener(new LocalMusicAdapter.onItemClick() {
+            @Override
+            public void itemClickListener(int position) {
+                if (mService != null) {
+                    try {
+                        mService.openAudio(0);
+                    } catch (RemoteException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        });
+    }
+
+    private TestAidlInterface mService;
+
+    //使用ServiceConnection来监听Service状态的变化
+    private ServiceConnection conn = new ServiceConnection() {
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            mService = null;
+        }
+
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder binder) {
+            //这里我们实例化audioService,通过binder来实现
+            //audioService = ((TestService.AudioBinder) binder).getService();
+            //audioService.playMusic();
+            mService = TestAidlInterface.Stub.asInterface(binder);
+        }
+    };
 
     @Override
     public void onScanningMusicComplete(ArrayList<SongModel> music) {
