@@ -7,6 +7,10 @@ import android.support.v7.widget.RecyclerView;
 import com.chao.peakmusic.R;
 import com.chao.peakmusic.adapter.LocalMusicAdapter;
 import com.chao.peakmusic.base.BaseFragment;
+import com.chao.peakmusic.model.SongModel;
+import com.chao.peakmusic.utils.ScanningUtils;
+
+import java.util.ArrayList;
 
 import butterknife.BindView;
 
@@ -15,7 +19,7 @@ import butterknife.BindView;
  * Created by Chao on 2017-12-18.
  */
 
-public class LocalMusicFragment extends BaseFragment {
+public class LocalMusicFragment extends BaseFragment implements ScanningUtils.ScanningListener {
     @BindView(R.id.local_music_list)
     RecyclerView musicList;
     private LocalMusicAdapter adapter;
@@ -39,4 +43,18 @@ public class LocalMusicFragment extends BaseFragment {
         musicList.setAdapter(adapter = new LocalMusicAdapter());
     }
 
+    @Override
+    public void initData() {
+        if (ScanningUtils.getInstance(mContext).getMusic() == null) {
+            ScanningUtils.getInstance(mContext).setListener(this).scanMusic();
+        } else {
+            onScanningMusicComplete(ScanningUtils.getInstance(mContext).getMusic());
+        }
+
+    }
+
+    @Override
+    public void onScanningMusicComplete(ArrayList<SongModel> music) {
+        adapter.setData(music);
+    }
 }

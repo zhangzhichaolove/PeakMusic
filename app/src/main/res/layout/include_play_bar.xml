@@ -20,7 +20,8 @@
             android:layout_height="45dp"
             android:contentDescription="@null"
             android:scaleType="fitXY"
-            android:src="@drawable/default_cover" />
+            android:src="@drawable/default_cover"
+            android:transitionName="album" />
 
         <LinearLayout
             android:layout_width="0dp"

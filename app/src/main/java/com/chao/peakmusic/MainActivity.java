@@ -1,6 +1,10 @@
 package com.chao.peakmusic;
 
+import android.app.ActivityOptions;
+import android.content.Intent;
+import android.os.Build;
 import android.support.annotation.NonNull;
+import android.support.annotation.RequiresApi;
 import android.support.design.widget.NavigationView;
 import android.support.design.widget.TabLayout;
 import android.support.v4.view.GravityCompat;
@@ -11,9 +15,13 @@ import android.support.v7.widget.Toolbar;
 import android.view.KeyEvent;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
 
+import com.chao.peakmusic.activity.MusicPlayActivity;
 import com.chao.peakmusic.adapter.HomePageAdapter;
 import com.chao.peakmusic.base.BaseActivity;
+import com.chao.peakmusic.utils.ImageLoaderV4;
 import com.chao.peakmusic.utils.KeyDownUtils;
 
 import butterknife.BindView;
@@ -29,6 +37,10 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
     NavigationView nv_menu;
     @BindView(R.id.vp_content)
     ViewPager vp_content;
+    @BindView(R.id.fl_play_bar)
+    FrameLayout fl_play_bar;
+    @BindView(R.id.iv_play_bar_cover)
+    ImageView iv_album_cover;
     private HomePageAdapter pageAdapter;
 
     @Override
@@ -46,6 +58,7 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         pageAdapter = new HomePageAdapter(getSupportFragmentManager());
         vp_content.setAdapter(pageAdapter);
         tabs.setupWithViewPager(vp_content);
+        ImageLoaderV4.getInstance().loadCircle(mContext, iv_album_cover, R.drawable.default_cover);
         //getSupportFragmentManager().beginTransaction().add(R.id.fl_content, LocalMusicFragment.newInstance(), LocalMusicFragment.class.getName()).commit();
     }
 
@@ -69,6 +82,7 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         //vp_content.addOnPageChangeListener(presenter);
         mDrawerLayout.addDrawerListener(mDrawerToggle);
         nv_menu.setNavigationItemSelectedListener(this);
+        fl_play_bar.setOnClickListener(this);
     }
 
     @Override
@@ -89,6 +103,19 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
             mDrawerLayout.closeDrawer(GravityCompat.START);
         }
         return false;
+    }
+
+
+    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+    @Override
+    public void onClick(View view) {
+        super.onClick(view);
+        switch (view.getId()) {
+            case R.id.fl_play_bar:
+                Intent intent = new Intent(mContext, MusicPlayActivity.class);
+                startActivity(intent, ActivityOptions.makeSceneTransitionAnimation(this, iv_album_cover, "album").toBundle());
+                break;
+        }
     }
 
     @Override
