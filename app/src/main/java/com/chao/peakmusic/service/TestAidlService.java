@@ -104,12 +104,16 @@ public class TestAidlService extends Service {
 
         @Override
         public void play() throws RemoteException {
-
+            if (mediaPlayer != null) {
+                mediaPlayer.start();
+            }
         }
 
         @Override
         public void pause() throws RemoteException {
-
+            if (mediaPlayer != null) {
+                mediaPlayer.pause();
+            }
         }
 
         @Override
