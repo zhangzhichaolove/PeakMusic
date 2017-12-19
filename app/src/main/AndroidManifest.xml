@@ -23,6 +23,8 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <service android:name=".service.TestService" />
+
         <activity android:name=".MainActivity" />
         <activity android:name=".activity.MusicPlayActivity" />
     </application>
