@@ -3,6 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@drawable/bg_colorful"
     android:orientation="vertical">
 
     <!--    <com.chao.peakmusic.widget.CustomToolbar
@@ -33,6 +34,16 @@
         app:tabMode="fixed"
         app:tabSelectedTextColor="@color/red"
         app:tabTextColor="@color/white"></android.support.design.widget.TabLayout>
+
+    <!--1、控件必须有设置 background ，且不能为透明
+    2、阴影是绘制于父控件上的，所以控件与父控件的边界之间需有足够空间绘制出阴影才行。
+    3、如果不设置 background 的话，可以添加 android:outlineProvider="bounds"-->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="0px"
+        android:layout_below="@id/tabs"
+        android:elevation="1.5dp"
+        android:outlineProvider="bounds" />
 
     <android.support.v4.view.ViewPager
         android:id="@+id/vp_content"
