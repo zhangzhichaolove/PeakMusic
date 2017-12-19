@@ -54,9 +54,14 @@ public class TestAidlService extends Service {
             mediaPlayer.reset();//重置播放器z状态
             mediaPlayer.setDataSource(currentPath);//指定音频文件路径
             mediaPlayer.setLooping(true);//设置为循环播放
-            mediaPlayer.prepare();//初始化播放器MediaPlayer
-
-            mediaPlayer.start();
+            mediaPlayer.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
+                @Override
+                public void onPrepared(MediaPlayer mediaPlayer) {
+                    mediaPlayer.start();
+                }
+            });
+            //mediaPlayer.prepare();//初始化播放器MediaPlayer
+            mediaPlayer.prepareAsync();//异步初始化播放器MediaPlayer
 
             // updateSeekBar();
 
