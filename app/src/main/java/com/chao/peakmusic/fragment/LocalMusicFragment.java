@@ -60,7 +60,7 @@ public class LocalMusicFragment extends BaseFragment implements ScanningUtils.Sc
         }
 
         Intent intent = new Intent(mContext, TestAidlService.class);
-        //startService(intent);
+        mContext.startService(intent);
         mContext.bindService(intent, conn, Context.BIND_AUTO_CREATE);
 
     }
