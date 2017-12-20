@@ -18,6 +18,7 @@ import java.util.ArrayList;
 
 public class LocalMusicAdapter extends RecyclerView.Adapter<LocalMusicAdapter.Holder> {
 
+    private onItemClick itemClick;
     private ArrayList<SongModel> data;
 
     @Override
@@ -27,9 +28,17 @@ public class LocalMusicAdapter extends RecyclerView.Adapter<LocalMusicAdapter.Ho
     }
 
     @Override
-    public void onBindViewHolder(LocalMusicAdapter.Holder holder, int position) {
+    public void onBindViewHolder(LocalMusicAdapter.Holder holder, final int position) {
         holder.tv_title.setText(data.get(position).getSong());
         holder.tv_artist.setText(data.get(position).getSinger().equals("<unknown>") ? data.get(position).getAlbum() : data.get(position).getSinger());
+        holder.itemView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (itemClick != null) {
+                    itemClick.itemClickListener(position);
+                }
+            }
+        });
         //ImageLoaderV4.getInstance().load(holder.itemView.getContext(), holder.iv_cover, Uri.parse("content://media/external/audio/media/" + data.get(position).getAlbumId() + "/albumart"));
     }
 
@@ -43,6 +52,10 @@ public class LocalMusicAdapter extends RecyclerView.Adapter<LocalMusicAdapter.Ho
         notifyDataSetChanged();
     }
 
+    public void setListener(onItemClick itemClick) {
+        this.itemClick = itemClick;
+    }
+
     public class Holder extends RecyclerView.ViewHolder {
         public TextView tv_title;
         public TextView tv_artist;
@@ -54,6 +67,10 @@ public class LocalMusicAdapter extends RecyclerView.Adapter<LocalMusicAdapter.Ho
             tv_artist = itemView.findViewById(R.id.tv_artist);
             iv_cover = itemView.findViewById(R.id.iv_cover);
         }
+    }
+
+    public interface onItemClick {
+        void itemClickListener(int position);
     }
 
 
