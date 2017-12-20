@@ -89,8 +89,6 @@ public class LocalMusicFragment extends BaseFragment implements ScanningUtils.Sc
         @Override
         public void onServiceConnected(ComponentName name, IBinder binder) {
             //这里我们实例化audioService,通过binder来实现
-            //audioService = ((TestService.AudioBinder) binder).getService();
-            //audioService.playMusic();
             mService = MusicAidlInterface.Stub.asInterface(binder);
         }
     };

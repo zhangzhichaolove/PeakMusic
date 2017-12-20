@@ -23,17 +23,22 @@ interface MusicAidlInterface {
      /**
       * 获取歌曲名称
       */
-      void getMusicName();
+      String getMusicName();
+
+      /**
+      * 是否播放中
+      */
+      boolean isPlay();
 
      /**
       * 获取歌曲时长
       */
-      void getDuration();
+      long getDuration();
 
      /**
       * 获取歌曲当前播放位置
       */
-      void getCurrentPosition();
+      int getCurrentPosition();
 
      /**
       * 播放指定进度

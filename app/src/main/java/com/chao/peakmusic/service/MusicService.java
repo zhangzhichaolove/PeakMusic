@@ -9,8 +9,11 @@ import android.os.RemoteException;
 import android.support.annotation.Nullable;
 
 import com.chao.peakmusic.MusicAidlInterface;
+import com.chao.peakmusic.listener.ControlsClickListener;
 import com.chao.peakmusic.model.SongModel;
 import com.chao.peakmusic.utils.LogUtils;
+import com.chao.peakmusic.utils.ScreenUtils;
+import com.cleveroad.audiowidget.AudioWidget;
 
 import java.io.File;
 import java.io.IOException;
@@ -26,18 +29,26 @@ public class MusicService extends Service {
 
     public static final String EXTRAS_MUSIC = "extras_music";
 
+    private AudioWidget audioWidget;
     private MediaPlayer mediaPlayer;
+    private ControlsClickListener controlsClickListener;
     private ArrayList<SongModel> music;
+    private SongModel currentMusic;
+    private int currentPosition;
 
     @Override
     public void onCreate() {
         super.onCreate();
-        LogUtils.showTagE("onCreate");
+        audioWidget = new AudioWidget.Builder(this).build();
+        controlsClickListener = new ControlsClickListener(stub);
+        audioWidget.controller().onControlsClickListener(controlsClickListener);
+        audioWidget.show(ScreenUtils.getScreenWidth(), ScreenUtils.getScreenHeight() / 2);
+        LogUtils.showTagE("服务创建");
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        LogUtils.showTagE("onStartCommand");
+        LogUtils.showTagE("服务启动");
         music = (ArrayList<SongModel>) intent.getSerializableExtra(EXTRAS_MUSIC);
         return super.onStartCommand(intent, flags, startId);
 
@@ -46,20 +57,20 @@ public class MusicService extends Service {
     @Nullable
     @Override
     public IBinder onBind(Intent intent) {
-        LogUtils.showTagE("onBind");
+        LogUtils.showTagE("服务绑定");
         return stub;
     }
 
     @Override
     public boolean onUnbind(Intent intent) {
-        LogUtils.showTagE("onUnbind");
+        LogUtils.showTagE("服务解除绑定");
         return true;
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
-        LogUtils.showTagE("onDestroy");
+        LogUtils.showTagE("服务销毁");
     }
 
     /**
@@ -67,8 +78,7 @@ public class MusicService extends Service {
      *
      * @param currentPath 音乐文件路径
      */
-    public void playMusic(String currentPath) {
-
+    private void playMusic(String currentPath) {
         try {
             if (mediaPlayer == null) {
                 mediaPlayer = new MediaPlayer();
@@ -88,9 +98,6 @@ public class MusicService extends Service {
             });
             //mediaPlayer.prepare();//初始化播放器MediaPlayer
             mediaPlayer.prepareAsync();//异步初始化播放器MediaPlayer
-
-            // updateSeekBar();
-
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -110,17 +117,40 @@ public class MusicService extends Service {
         }
     }
 
+    private void updateStatus() {
+        if (mediaPlayer == null) {
+            //audioWidget.controller().stop();
+        } else {
+//            if (mediaPlayer.isPlaying()) {
+//                audioWidget.controller().start();
+//            } else {
+//                audioWidget.controller().stop();
+//            }
+//            controlsClickListener.onPlayPauseClicked();
+        }
+    }
+
     private MusicAidlInterface.Stub stub = new MusicAidlInterface.Stub() {
 
         @Override
         public void openAudio(int position) throws RemoteException {
+            currentMusic = music.get(position);
+            currentPosition = position;
             playMusic(music.get(position).getPath()/*"/storage/emulated/0/Download/What are words.mp3"*/);
+            if (!controlsClickListener.isPlaying()) {
+                audioWidget.controller().start();
+            }
         }
 
         @Override
         public void play() throws RemoteException {
-            if (mediaPlayer != null) {
+            if (mediaPlayer != null && currentMusic != null) {
                 mediaPlayer.start();
+            } else if (mediaPlayer == null) {
+                openAudio(0);
+            }
+            if (!controlsClickListener.isPlaying()) {
+                audioWidget.controller().start();
             }
         }
 
@@ -129,26 +159,34 @@ public class MusicService extends Service {
             if (mediaPlayer != null) {
                 mediaPlayer.pause();
             }
+            if (controlsClickListener.isPlaying()) {
+                audioWidget.controller().pause();
+            }
         }
 
         @Override
-        public void getMusicName() throws RemoteException {
-
+        public String getMusicName() throws RemoteException {
+            return currentMusic.getSong();
         }
 
         @Override
-        public void getDuration() throws RemoteException {
-
+        public boolean isPlay() throws RemoteException {
+            return mediaPlayer != null && mediaPlayer.isPlaying();
         }
 
         @Override
-        public void getCurrentPosition() throws RemoteException {
+        public long getDuration() throws RemoteException {
+            return currentMusic.getDuration();
+        }
 
+        @Override
+        public int getCurrentPosition() throws RemoteException {
+            return currentPosition;
         }
 
         @Override
         public void seekTo(int position) throws RemoteException {
-
+            mediaPlayer.seekTo(position);
         }
 
         @Override
@@ -158,13 +196,14 @@ public class MusicService extends Service {
 
         @Override
         public void pre() throws RemoteException {
-
+            currentPosition--;
         }
 
         @Override
         public void next() throws RemoteException {
-
+            currentPosition++;
         }
+
     };
 
 }

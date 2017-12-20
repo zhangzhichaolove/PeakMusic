@@ -25,12 +25,9 @@ import android.widget.ImageView;
 import com.chao.peakmusic.activity.MusicPlayActivity;
 import com.chao.peakmusic.adapter.HomePageAdapter;
 import com.chao.peakmusic.base.BaseActivity;
-import com.chao.peakmusic.listener.ControlsClickListener;
 import com.chao.peakmusic.service.TestService;
 import com.chao.peakmusic.utils.ImageLoaderV4;
 import com.chao.peakmusic.utils.KeyDownUtils;
-import com.chao.peakmusic.utils.ScreenUtils;
-import com.cleveroad.audiowidget.AudioWidget;
 
 import butterknife.BindView;
 
@@ -91,9 +88,6 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         mDrawerLayout.addDrawerListener(mDrawerToggle);
         nv_menu.setNavigationItemSelectedListener(this);
         fl_play_bar.setOnClickListener(this);
-        AudioWidget audioWidget = new AudioWidget.Builder(mContext).build();
-        audioWidget.controller().onControlsClickListener(new ControlsClickListener());
-        audioWidget.show(ScreenUtils.getScreenWidth(), ScreenUtils.getScreenHeight() / 2);
 
         Intent intent = new Intent("com.chao.peakmusic.action.MUSIC_SERVICE");
         intent.setPackage(getPackageName());

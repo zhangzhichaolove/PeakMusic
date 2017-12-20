@@ -49,4 +49,67 @@ public class TestService extends Service {
     public void playMusic() {
         LogUtils.showTagE("playMusic");
     }
+
+
+    /**
+     * 打开一个音频文件
+     */
+    public void openAudio(int position) {
+
+    }
+
+    /**
+     * 播放
+     */
+    public void play() {
+
+    }
+
+    /**
+     * 暂停
+     */
+    public void pause() {
+    }
+
+    /**
+     * 获取歌曲名称
+     */
+    public void getMusicName() {
+    }
+
+    /**
+     * 获取歌曲时长
+     */
+    public void getDuration() {
+    }
+
+    /**
+     * 获取歌曲当前播放位置
+     */
+    public void getCurrentPosition() {
+    }
+
+    /**
+     * 播放指定进度
+     */
+    public void seekTo(int position) {
+    }
+
+    /**
+     * 设置播放模式
+     */
+    public void seekPlayMode(int mode) {
+    }
+
+    /**
+     * 上一首
+     */
+    public void pre() {
+    }
+
+    /**
+     * 下一首
+     */
+    public void next() {
+    }
 }

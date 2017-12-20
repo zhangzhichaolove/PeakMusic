@@ -1,6 +1,8 @@
 package com.chao.peakmusic;
 
 import android.app.Application;
+import android.content.Context;
+import android.support.multidex.MultiDex;
 
 import com.chao.peakmusic.utils.AppStatusListener;
 import com.chao.peakmusic.utils.GeneralVar;
@@ -18,5 +20,11 @@ public class App extends Application {
         GeneralVar.setContext(this);
         ScanningUtils.getInstance(this).scanMusic();
         registerActivityLifecycleCallbacks(AppStatusListener.getInstance().getAppLifecycleListener());
+    }
+
+    @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(base);
+        MultiDex.install(this);
     }
 }
