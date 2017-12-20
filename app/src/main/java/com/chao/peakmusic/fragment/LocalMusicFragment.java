@@ -58,11 +58,6 @@ public class LocalMusicFragment extends BaseFragment implements ScanningUtils.Sc
         } else {
             onScanningMusicComplete(ScanningUtils.getInstance(mContext).getMusic());
         }
-
-        Intent intent = new Intent(mContext, MusicService.class);
-        mContext.startService(intent);
-        mContext.bindService(intent, conn, Context.BIND_AUTO_CREATE);
-
     }
 
     @Override
@@ -72,7 +67,7 @@ public class LocalMusicFragment extends BaseFragment implements ScanningUtils.Sc
             public void itemClickListener(int position) {
                 if (mService != null) {
                     try {
-                        mService.openAudio(0);
+                        mService.openAudio(position);
                     } catch (RemoteException e) {
                         e.printStackTrace();
                     }
@@ -103,5 +98,15 @@ public class LocalMusicFragment extends BaseFragment implements ScanningUtils.Sc
     @Override
     public void onScanningMusicComplete(ArrayList<SongModel> music) {
         adapter.setData(music);
+        Intent intent = new Intent(mContext, MusicService.class);
+        intent.putExtra(MusicService.EXTRAS_MUSIC, music);
+        mContext.startService(intent);
+        mContext.bindService(intent, conn, Context.BIND_AUTO_CREATE);
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        mContext.unbindService(conn);
     }
 }

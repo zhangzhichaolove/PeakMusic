@@ -9,10 +9,12 @@ import android.os.RemoteException;
 import android.support.annotation.Nullable;
 
 import com.chao.peakmusic.MusicAidlInterface;
+import com.chao.peakmusic.model.SongModel;
 import com.chao.peakmusic.utils.LogUtils;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 
 
 /**
@@ -22,7 +24,10 @@ import java.io.IOException;
 
 public class MusicService extends Service {
 
+    public static final String EXTRAS_MUSIC = "extras_music";
+
     private MediaPlayer mediaPlayer;
+    private ArrayList<SongModel> music;
 
     @Override
     public void onCreate() {
@@ -33,6 +38,7 @@ public class MusicService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         LogUtils.showTagE("onStartCommand");
+        music = (ArrayList<SongModel>) intent.getSerializableExtra(EXTRAS_MUSIC);
         return super.onStartCommand(intent, flags, startId);
 
     }
@@ -108,7 +114,7 @@ public class MusicService extends Service {
 
         @Override
         public void openAudio(int position) throws RemoteException {
-            playMusic("/storage/emulated/0/Download/What are words.mp3");
+            playMusic(music.get(position).getPath()/*"/storage/emulated/0/Download/What are words.mp3"*/);
         }
 
         @Override

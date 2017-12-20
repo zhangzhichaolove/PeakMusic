@@ -1,10 +1,12 @@
 package com.chao.peakmusic.model;
 
+import java.io.Serializable;
+
 /**
  * Created by Chao on 2017-12-19.
  */
 
-public class SongModel {
+public class SongModel implements Serializable {
 
     /**
      * 歌手
