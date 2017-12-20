@@ -1,11 +1,11 @@
 package com.chao.peakmusic;
 
 import android.app.ActivityOptions;
+import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.Build;
-import android.os.IBinder;
-import android.os.RemoteException;
 import android.os.IBinder;
 import android.support.annotation.NonNull;
 import android.support.annotation.RequiresApi;
@@ -25,12 +25,10 @@ import android.widget.ImageView;
 import com.chao.peakmusic.activity.MusicPlayActivity;
 import com.chao.peakmusic.adapter.HomePageAdapter;
 import com.chao.peakmusic.base.BaseActivity;
-import com.chao.peakmusic.service.TestService;
 import com.chao.peakmusic.listener.ControlsClickListener;
-import com.chao.peakmusic.service.MusicService;
+import com.chao.peakmusic.service.TestService;
 import com.chao.peakmusic.utils.ImageLoaderV4;
 import com.chao.peakmusic.utils.KeyDownUtils;
-import com.chao.peakmusic.utils.LogUtils;
 import com.chao.peakmusic.utils.ScreenUtils;
 import com.cleveroad.audiowidget.AudioWidget;
 
@@ -52,7 +50,6 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
     @BindView(R.id.iv_play_bar_cover)
     ImageView iv_album_cover;
     private HomePageAdapter pageAdapter;
-    private MusicServiceConnection connection;
 
     @Override
     public int getLayout() {
@@ -69,7 +66,6 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         pageAdapter = new HomePageAdapter(getSupportFragmentManager());
         vp_content.setAdapter(pageAdapter);
         tabs.setupWithViewPager(vp_content);
-        connection = new MusicServiceConnection();
         ImageLoaderV4.getInstance().loadCircle(mContext, iv_album_cover, R.drawable.default_cover);
         //getSupportFragmentManager().beginTransaction().add(R.id.fl_content, LocalMusicFragment.newInstance(), LocalMusicFragment.class.getName()).commit();
     }
@@ -99,17 +95,11 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         audioWidget.controller().onControlsClickListener(new ControlsClickListener());
         audioWidget.show(ScreenUtils.getScreenWidth(), ScreenUtils.getScreenHeight() / 2);
 
-        Intent serviceIntent = new Intent(this, MusicService.class);
-        startService(serviceIntent);
-        bindService(serviceIntent, connection, Context.BIND_AUTO_CREATE);
-        //unbindService(connection);
         Intent intent = new Intent("com.chao.peakmusic.action.MUSIC_SERVICE");
         intent.setPackage(getPackageName());
         startService(intent);
         bindService(intent, conn, Context.BIND_AUTO_CREATE);
-        //AudioWidget audioWidget = new AudioWidget.Builder(mContext).build();
-        //audioWidget.controller().onControlsClickListener(new ControlsClickListener());
-        //audioWidget.show(ScreenUtils.getScreenWidth(), ScreenUtils.getScreenHeight() / 2);
+        //unbindService(connection);
     }
 
     private TestService audioService;
@@ -149,31 +139,6 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         }
         return false;
     }
-
-    private class MusicServiceConnection implements ServiceConnection {
-
-        @Override
-        public void onServiceConnected(ComponentName name, IBinder service) {
-            MusicAidlInterface musicAidlInterface = MusicAidlInterface.Stub.asInterface(service);
-            try {
-                musicAidlInterface.playMusic();
-            } catch (RemoteException e) {
-                e.printStackTrace();
-            }
-            LogUtils.showTagE(name + "--" + service);
-        }
-
-        @Override
-        public void onServiceDisconnected(ComponentName name) {
-            LogUtils.showTagE("onServiceDisconnected" + name);
-        }
-
-        @Override
-        public void onBindingDied(ComponentName name) {
-            LogUtils.showTagE("onServiceDisconnected" + name);
-        }
-    }
-
 
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     @Override

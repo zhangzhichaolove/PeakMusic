@@ -10,12 +10,12 @@ import android.os.RemoteException;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 
+import com.chao.peakmusic.MusicAidlInterface;
 import com.chao.peakmusic.R;
-import com.chao.peakmusic.TestAidlInterface;
 import com.chao.peakmusic.adapter.LocalMusicAdapter;
 import com.chao.peakmusic.base.BaseFragment;
 import com.chao.peakmusic.model.SongModel;
-import com.chao.peakmusic.service.TestAidlService;
+import com.chao.peakmusic.service.MusicService;
 import com.chao.peakmusic.utils.ScanningUtils;
 
 import java.util.ArrayList;
@@ -59,7 +59,7 @@ public class LocalMusicFragment extends BaseFragment implements ScanningUtils.Sc
             onScanningMusicComplete(ScanningUtils.getInstance(mContext).getMusic());
         }
 
-        Intent intent = new Intent(mContext, TestAidlService.class);
+        Intent intent = new Intent(mContext, MusicService.class);
         mContext.startService(intent);
         mContext.bindService(intent, conn, Context.BIND_AUTO_CREATE);
 
@@ -81,7 +81,7 @@ public class LocalMusicFragment extends BaseFragment implements ScanningUtils.Sc
         });
     }
 
-    private TestAidlInterface mService;
+    private MusicAidlInterface mService;
 
     //使用ServiceConnection来监听Service状态的变化
     private ServiceConnection conn = new ServiceConnection() {
@@ -96,7 +96,7 @@ public class LocalMusicFragment extends BaseFragment implements ScanningUtils.Sc
             //这里我们实例化audioService,通过binder来实现
             //audioService = ((TestService.AudioBinder) binder).getService();
             //audioService.playMusic();
-            mService = TestAidlInterface.Stub.asInterface(binder);
+            mService = MusicAidlInterface.Stub.asInterface(binder);
         }
     };
 

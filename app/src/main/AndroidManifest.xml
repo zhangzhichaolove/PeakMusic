@@ -23,6 +23,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
         <service
             android:name=".service.MusicService"
             android:enabled="true"
@@ -35,7 +36,6 @@
                 <action android:name="com.chao.peakmusic.action.MUSIC_SERVICE" />
             </intent-filter>
         </service>
-        <service android:name=".service.TestAidlService" />
 
         <activity android:name=".MainActivity" />
         <activity android:name=".activity.MusicPlayActivity" />
