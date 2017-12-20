@@ -1,12 +1,15 @@
 package com.chao.peakmusic.model;
 
+import android.os.Parcel;
+import android.os.Parcelable;
+
 import java.io.Serializable;
 
 /**
  * Created by Chao on 2017-12-19.
  */
 
-public class SongModel implements Serializable {
+public class SongModel implements Serializable, Parcelable {
 
     /**
      * 歌手
@@ -102,4 +105,43 @@ public class SongModel implements Serializable {
     public void setSize(long size) {
         this.size = size;
     }
+
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    @Override
+    public void writeToParcel(Parcel dest, int flags) {
+        dest.writeString(singer);
+        dest.writeString(song);
+        dest.writeString(album);
+        dest.writeLong(albumId);
+        dest.writeString(path);
+        dest.writeInt(duration);
+        dest.writeLong(size);
+    }
+
+    public static final Parcelable.Creator<SongModel> CREATOR = new Creator<SongModel>() {
+        @Override
+        public SongModel createFromParcel(Parcel source) {
+            return new SongModel(source);
+        }
+
+        @Override
+        public SongModel[] newArray(int size) {
+            return new SongModel[size];
+        }
+    };
+
+    private SongModel(Parcel in) {
+        singer = in.readString();
+        song = in.readString();
+        album = in.readString();
+        albumId = in.readLong();
+        path = in.readString();
+        duration = in.readInt();
+        size = in.readLong();
+    }
+
 }

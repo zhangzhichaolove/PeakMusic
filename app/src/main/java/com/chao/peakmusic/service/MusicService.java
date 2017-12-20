@@ -18,6 +18,8 @@ import com.cleveroad.audiowidget.AudioWidget;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Timer;
+import java.util.TimerTask;
 
 
 /**
@@ -28,6 +30,9 @@ import java.util.ArrayList;
 public class MusicService extends Service {
 
     public static final String EXTRAS_MUSIC = "extras_music";
+    private static final String TAG = "MusicService";
+    private static final long UPDATE_INTERVAL = 1000;
+    private Timer timer;
 
     private AudioWidget audioWidget;
     private MediaPlayer mediaPlayer;
@@ -40,7 +45,7 @@ public class MusicService extends Service {
     public void onCreate() {
         super.onCreate();
         audioWidget = new AudioWidget.Builder(this).build();
-        controlsClickListener = new ControlsClickListener(stub);
+        controlsClickListener = new ControlsClickListener(stub, this);
         audioWidget.controller().onControlsClickListener(controlsClickListener);
         audioWidget.show(ScreenUtils.getScreenWidth(), ScreenUtils.getScreenHeight() / 2);
         LogUtils.showTagE("服务创建");
@@ -50,6 +55,7 @@ public class MusicService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         LogUtils.showTagE("服务启动");
         music = (ArrayList<SongModel>) intent.getSerializableExtra(EXTRAS_MUSIC);
+        startTrackingPosition();
         return super.onStartCommand(intent, flags, startId);
 
     }
@@ -70,6 +76,7 @@ public class MusicService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        stopTrackingPosition();
         LogUtils.showTagE("服务销毁");
     }
 
@@ -94,6 +101,8 @@ public class MusicService extends Service {
                 @Override
                 public void onPrepared(MediaPlayer mediaPlayer) {
                     mediaPlayer.start();
+                    audioWidget.controller().duration(mediaPlayer.getDuration());
+                    startTrackingPosition();
                 }
             });
             //mediaPlayer.prepare();//初始化播放器MediaPlayer
@@ -117,17 +126,26 @@ public class MusicService extends Service {
         }
     }
 
-    private void updateStatus() {
-        if (mediaPlayer == null) {
-            //audioWidget.controller().stop();
-        } else {
-//            if (mediaPlayer.isPlaying()) {
-//                audioWidget.controller().start();
-//            } else {
-//                audioWidget.controller().stop();
-//            }
-//            controlsClickListener.onPlayPauseClicked();
-        }
+    private void startTrackingPosition() {
+        timer = new Timer(TAG);
+        timer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                AudioWidget widget = audioWidget;
+                MediaPlayer player = mediaPlayer;
+                if (mediaPlayer != null && mediaPlayer.isPlaying() && widget != null) {
+                    widget.controller().position(player.getCurrentPosition());
+                }
+            }
+        }, UPDATE_INTERVAL, UPDATE_INTERVAL);
+    }
+
+    private void stopTrackingPosition() {
+        if (timer == null)
+            return;
+        timer.cancel();
+        timer.purge();
+        timer = null;
     }
 
     private MusicAidlInterface.Stub stub = new MusicAidlInterface.Stub() {
