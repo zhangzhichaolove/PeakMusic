@@ -12,10 +12,17 @@ import com.chao.peakmusic.fragment.LocalMusicFragment;
 
 public class HomePageAdapter extends FragmentPagerAdapter {
     private String[] mTitles = new String[]{"本地音乐", "在线音乐"};
-    private Fragment[] fragments = new Fragment[]{LocalMusicFragment.newInstance(), LocalMusicFragment.newInstance()};
+    private Fragment[] fragments;
+    private LocalMusicFragment localMusicFragment;
+
+    public LocalMusicFragment getLocalMusicFragment() {
+        return localMusicFragment;
+    }
 
     public HomePageAdapter(FragmentManager fm) {
         super(fm);
+        localMusicFragment = LocalMusicFragment.newInstance();
+        fragments = new Fragment[]{localMusicFragment, LocalMusicFragment.newInstance()};
     }
 
     @Override

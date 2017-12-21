@@ -36,6 +36,12 @@ interface MusicAidlInterface {
       long getDuration();
 
      /**
+      * 获取歌曲当前播放索引
+      */
+
+      int getCurrentIndex();
+
+     /**
       * 获取歌曲当前播放位置
       */
       int getCurrentPosition();

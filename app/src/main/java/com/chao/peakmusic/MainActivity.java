@@ -6,7 +6,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
+import android.os.RemoteException;
 import android.support.annotation.NonNull;
 import android.support.annotation.RequiresApi;
 import android.support.design.widget.NavigationView;
@@ -21,17 +24,33 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
+import android.widget.TextView;
 
 import com.chao.peakmusic.activity.MusicPlayActivity;
 import com.chao.peakmusic.adapter.HomePageAdapter;
 import com.chao.peakmusic.base.BaseActivity;
+import com.chao.peakmusic.fragment.LocalMusicFragment;
+import com.chao.peakmusic.listener.PlayMusicListener;
+import com.chao.peakmusic.model.SongModel;
+import com.chao.peakmusic.service.MusicService;
 import com.chao.peakmusic.service.TestService;
+import com.chao.peakmusic.utils.AppStatusListener;
 import com.chao.peakmusic.utils.ImageLoaderV4;
 import com.chao.peakmusic.utils.KeyDownUtils;
+import com.chao.peakmusic.utils.ScanningUtils;
+
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import butterknife.BindView;
 
-public class MainActivity extends BaseActivity implements NavigationView.OnNavigationItemSelectedListener {
+public class MainActivity extends BaseActivity implements NavigationView.OnNavigationItemSelectedListener, ScanningUtils.ScanningListener {
+    private static final long UPDATE_INTERVAL = 1000;
     @BindView(R.id.mToolbar)
     Toolbar mToolbar;
     @BindView(R.id.tabs)
@@ -50,7 +69,18 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
     ImageView iv_play;
     @BindView(R.id.iv_next)
     ImageView iv_next;
+    @BindView(R.id.pb_play_bar)
+    ProgressBar pb_play_bar;
+    @BindView(R.id.tv_title)
+    TextView tv_title;
+    @BindView(R.id.tv_artist)
+    TextView tv_artist;
+    private Handler handler;
     private HomePageAdapter pageAdapter;
+    private ScheduledExecutorService timer;
+    private LocalMusicFragment localMusicFragment;
+    private ProgressUpdateListener listener;
+    private ArrayList<SongModel> music;
 
     @Override
     public int getLayout() {
@@ -65,10 +95,23 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         getSupportActionBar().setHomeButtonEnabled(true); //设置返回键可用
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         pageAdapter = new HomePageAdapter(getSupportFragmentManager());
+        localMusicFragment = pageAdapter.getLocalMusicFragment();
         vp_content.setAdapter(pageAdapter);
         tabs.setupWithViewPager(vp_content);
+        handler = new Handler(Looper.getMainLooper());
+        timer = Executors.newScheduledThreadPool(1);
         ImageLoaderV4.getInstance().loadCircle(mContext, iv_album_cover, R.drawable.default_cover);
         //getSupportFragmentManager().beginTransaction().add(R.id.fl_content, LocalMusicFragment.newInstance(), LocalMusicFragment.class.getName()).commit();
+    }
+
+    @Override
+    public void initData() {
+        if (ScanningUtils.getInstance(mContext).getMusic() == null) {
+            ScanningUtils.getInstance(mContext).setListener(this).scanMusic();
+        } else {
+            onScanningMusicComplete(ScanningUtils.getInstance(mContext).getMusic());
+        }
+        startTrackingPosition();
     }
 
     @Override
@@ -98,14 +141,40 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         Intent intent = new Intent("com.chao.peakmusic.action.MUSIC_SERVICE");
         intent.setPackage(getPackageName());
         startService(intent);
-        bindService(intent, conn, Context.BIND_AUTO_CREATE);
+        bindService(intent, conns, Context.BIND_AUTO_CREATE);
         //unbindService(connection);
+
+        AppStatusListener.getInstance().setAppLifecycle(new AppStatusListener.AppLifecycle() {
+            @Override
+            public void AppBackstage(boolean isBackstage) {
+                try {
+                    if (isBackstage && mService != null) {
+                        mService.hide();
+                    } else {
+                        mService.show();
+                    }
+                } catch (RemoteException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+
+        localMusicFragment.setPlayMusicListener(new PlayMusicListener() {
+            @Override
+            public void playMusic(int position) {
+                try {
+                    mService.openAudio(position);
+                } catch (RemoteException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
     }
 
     private TestService audioService;
 
     //使用ServiceConnection来监听Service状态的变化
-    private ServiceConnection conn = new ServiceConnection() {
+    private ServiceConnection conns = new ServiceConnection() {
 
         @Override
         public void onServiceDisconnected(ComponentName name) {
@@ -156,6 +225,56 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         }
     }
 
+    private void startTrackingPosition() {
+        timer.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                handler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        System.out.println(new SimpleDateFormat("yyyy-MM-dd hh:mm:ss").format(new Date()));
+                        try {
+                            if (music == null || mService == null || mService.getCurrentIndex() == -1) {
+                                return;
+                            }
+                            SongModel model = music.get(mService.getCurrentIndex());
+                            tv_title.setText(model.getSong());
+                            tv_artist.setText(model.getSinger());
+                            pb_play_bar.setMax(model.getDuration());
+                            pb_play_bar.setProgress(mService.getCurrentPosition());
+                        } catch (RemoteException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                });
+            }
+        }, UPDATE_INTERVAL, UPDATE_INTERVAL, TimeUnit.MILLISECONDS);
+    }
+
+    private MusicAidlInterface mService;
+
+    //使用ServiceConnection来监听Service状态的变化
+    private ServiceConnection conn = new ServiceConnection() {
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            mService = null;
+        }
+
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder binder) {
+            //这里我们实例化audioService,通过binder来实现
+            mService = MusicAidlInterface.Stub.asInterface(binder);
+        }
+    };
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        timer.shutdown();
+        mContext.unbindService(conn);
+    }
+
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (mDrawerLayout.isDrawerOpen(GravityCompat.START)) {
@@ -163,5 +282,15 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
             return true;
         }
         return KeyDownUtils.BlackBackstage(this, keyCode);
+    }
+
+    @Override
+    public void onScanningMusicComplete(ArrayList<SongModel> music) {
+        localMusicFragment.setMusic(music);
+        Intent intent = new Intent(mContext, MusicService.class);
+        intent.putExtra(MusicService.EXTRAS_MUSIC, music);
+        mContext.startService(intent);
+        mContext.bindService(intent, conn, Context.BIND_AUTO_CREATE);
+        this.music = music;
     }
 }

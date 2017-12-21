@@ -44,7 +44,7 @@ public class MusicService extends Service implements AudioWidget.OnWidgetStateCh
     private ControlsClickListener controlsClickListener;
     private ArrayList<SongModel> music;
     private SongModel currentMusic;
-    private int currentPosition;
+    private int currentPosition = -1;
 
     @Override
     public void onCreate() {
@@ -225,8 +225,13 @@ public class MusicService extends Service implements AudioWidget.OnWidgetStateCh
         }
 
         @Override
-        public int getCurrentPosition() throws RemoteException {
+        public int getCurrentIndex() throws RemoteException {
             return currentPosition;
+        }
+
+        @Override
+        public int getCurrentPosition() throws RemoteException {
+            return mediaPlayer == null || !mediaPlayer.isPlaying() ? 0 : mediaPlayer.getCurrentPosition();
         }
 
         @Override
@@ -252,7 +257,7 @@ public class MusicService extends Service implements AudioWidget.OnWidgetStateCh
         @Override
         public void next() throws RemoteException {
             currentPosition++;
-            if (currentPosition <= music.size()) {
+            if (currentPosition <= music.size() - 1) {
                 openAudio(currentPosition);
             } else {
                 openAudio(0);

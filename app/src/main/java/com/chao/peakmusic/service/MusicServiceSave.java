@@ -205,6 +205,11 @@ public class MusicServiceSave extends Service {
         }
 
         @Override
+        public int getCurrentIndex() throws RemoteException {
+            return 0;
+        }
+
+        @Override
         public int getCurrentPosition() throws RemoteException {
             return currentPosition;
         }
