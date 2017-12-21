@@ -32,7 +32,6 @@ public class LocalMusicFragment extends BaseFragment implements ScanningUtils.Sc
     @BindView(R.id.local_music_list)
     RecyclerView musicList;
     private LocalMusicAdapter adapter;
-    private Intent intent;
 
     public static LocalMusicFragment newInstance() {
         Bundle args = new Bundle();
@@ -112,7 +111,7 @@ public class LocalMusicFragment extends BaseFragment implements ScanningUtils.Sc
     @Override
     public void onScanningMusicComplete(ArrayList<SongModel> music) {
         adapter.setData(music);
-        intent = new Intent(mContext, MusicService.class);
+        Intent intent = new Intent(mContext, MusicService.class);
         intent.putExtra(MusicService.EXTRAS_MUSIC, music);
         mContext.startService(intent);
         mContext.bindService(intent, conn, Context.BIND_AUTO_CREATE);
