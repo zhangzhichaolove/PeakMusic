@@ -93,20 +93,30 @@ public class MusicService extends Service {
             if (mediaPlayer == null) {
                 mediaPlayer = new MediaPlayer();
                 mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
+                mediaPlayer.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
+                    @Override
+                    public void onPrepared(MediaPlayer mediaPlayer) {
+                        mediaPlayer.start();
+                        audioWidget.controller().duration(mediaPlayer.getDuration());
+                    }
+                });
+                mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+                    @Override
+                    public void onCompletion(MediaPlayer mp) {
+                        try {
+                            stub.next();
+                        } catch (RemoteException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                });
             }
             if (mediaPlayer.isPlaying()) {//如果当前正在播放音乐，则先停止
                 mediaPlayer.stop();
             }
             mediaPlayer.reset();//重置播放器z状态
             mediaPlayer.setDataSource(currentPath);//指定音频文件路径
-            mediaPlayer.setLooping(true);//设置为循环播放
-            mediaPlayer.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
-                @Override
-                public void onPrepared(MediaPlayer mediaPlayer) {
-                    mediaPlayer.start();
-                    audioWidget.controller().duration(mediaPlayer.getDuration());
-                }
-            });
+            mediaPlayer.setLooping(false);//设置为循环播放
             //mediaPlayer.prepare();//初始化播放器MediaPlayer
             mediaPlayer.prepareAsync();//异步初始化播放器MediaPlayer
         } catch (IOException e) {
