@@ -46,6 +46,10 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
     FrameLayout fl_play_bar;
     @BindView(R.id.iv_play_bar_cover)
     ImageView iv_album_cover;
+    @BindView(R.id.iv_play)
+    ImageView iv_play;
+    @BindView(R.id.iv_next)
+    ImageView iv_next;
     private HomePageAdapter pageAdapter;
 
     @Override
@@ -88,6 +92,8 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         mDrawerLayout.addDrawerListener(mDrawerToggle);
         nv_menu.setNavigationItemSelectedListener(this);
         fl_play_bar.setOnClickListener(this);
+        iv_play.setOnClickListener(this);
+        iv_next.setOnClickListener(this);
 
         Intent intent = new Intent("com.chao.peakmusic.action.MUSIC_SERVICE");
         intent.setPackage(getPackageName());
@@ -142,6 +148,10 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
             case R.id.fl_play_bar:
                 Intent intent = new Intent(mContext, MusicPlayActivity.class);
                 startActivity(intent, ActivityOptions.makeSceneTransitionAnimation(this, iv_album_cover, "album").toBundle());
+                break;
+            case R.id.iv_play:
+                break;
+            case R.id.iv_next:
                 break;
         }
     }

@@ -10,6 +10,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_gravity="center_vertical"
+        android:background="?android:attr/selectableItemBackground"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingLeft="10dp"
@@ -54,16 +55,18 @@
         </LinearLayout>
 
         <ImageView
-            android:id="@+id/iv_play_bar_play"
+            android:id="@+id/iv_play"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
             android:contentDescription="@null"
             android:src="@drawable/play_bar_btn_play_pause_selector" />
 
         <ImageView
-            android:id="@+id/iv_play_bar_next"
+            android:id="@+id/iv_next"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
             android:contentDescription="@null"
             android:src="@drawable/ic_play_bar_btn_next" />
     </LinearLayout>
