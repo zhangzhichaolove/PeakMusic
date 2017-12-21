@@ -79,7 +79,6 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
     private HomePageAdapter pageAdapter;
     private ScheduledExecutorService timer;
     private LocalMusicFragment localMusicFragment;
-    private ProgressUpdateListener listener;
     private ArrayList<SongModel> music;
 
     @Override
