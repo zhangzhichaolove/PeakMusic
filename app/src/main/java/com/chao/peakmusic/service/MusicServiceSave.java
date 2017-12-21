@@ -229,6 +229,16 @@ public class MusicServiceSave extends Service {
             currentPosition++;
         }
 
+        @Override
+        public void show() throws RemoteException {
+
+        }
+
+        @Override
+        public void hide() throws RemoteException {
+
+        }
+
     };
 
 }

@@ -16,6 +16,7 @@ import com.chao.peakmusic.adapter.LocalMusicAdapter;
 import com.chao.peakmusic.base.BaseFragment;
 import com.chao.peakmusic.model.SongModel;
 import com.chao.peakmusic.service.MusicService;
+import com.chao.peakmusic.utils.AppStatusListener;
 import com.chao.peakmusic.utils.ScanningUtils;
 
 import java.util.ArrayList;
@@ -31,6 +32,7 @@ public class LocalMusicFragment extends BaseFragment implements ScanningUtils.Sc
     @BindView(R.id.local_music_list)
     RecyclerView musicList;
     private LocalMusicAdapter adapter;
+    private Intent intent;
 
     public static LocalMusicFragment newInstance() {
         Bundle args = new Bundle();
@@ -49,6 +51,20 @@ public class LocalMusicFragment extends BaseFragment implements ScanningUtils.Sc
     public void initView() {
         musicList.setLayoutManager(new LinearLayoutManager(mContext));
         musicList.setAdapter(adapter = new LocalMusicAdapter());
+        AppStatusListener.getInstance().setAppLifecycle(new AppStatusListener.AppLifecycle() {
+            @Override
+            public void AppBackstage(boolean isBackstage) {
+                try {
+                    if (isBackstage && mService != null) {
+                        mService.hide();
+                    } else {
+                        mService.show();
+                    }
+                } catch (RemoteException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
     }
 
     @Override
@@ -96,7 +112,7 @@ public class LocalMusicFragment extends BaseFragment implements ScanningUtils.Sc
     @Override
     public void onScanningMusicComplete(ArrayList<SongModel> music) {
         adapter.setData(music);
-        Intent intent = new Intent(mContext, MusicService.class);
+        intent = new Intent(mContext, MusicService.class);
         intent.putExtra(MusicService.EXTRAS_MUSIC, music);
         mContext.startService(intent);
         mContext.bindService(intent, conn, Context.BIND_AUTO_CREATE);

@@ -30,14 +30,21 @@
             android:exported="true"
             android:process=":remote" />
 
+        <!--android:process=":remote"-->
 
-        <service android:name=".service.TestService">
+
+        <service
+            android:name=".service.TestService"
+            android:enabled="true"
+            android:exported="true">
             <intent-filter>
                 <action android:name="com.chao.peakmusic.action.MUSIC_SERVICE" />
             </intent-filter>
         </service>
 
-        <activity android:name=".MainActivity" />
+        <activity
+            android:name=".MainActivity"
+            android:launchMode="singleTask" />
         <activity android:name=".activity.MusicPlayActivity" />
     </application>
 

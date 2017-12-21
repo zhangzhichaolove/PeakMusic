@@ -36,10 +36,6 @@ public class ControlsClickListener implements AudioWidget.OnControlsClickListene
      */
     @Override
     public boolean onPlaylistClicked() {
-        Intent intent = new Intent(context, MainActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        context.startActivity(intent);
         LogUtils.showTagE("onPlaylistClicked");
         return false;
     }
@@ -51,6 +47,11 @@ public class ControlsClickListener implements AudioWidget.OnControlsClickListene
 
     @Override
     public void onPreviousClicked() {
+        try {
+            stub.pre();
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        }
         LogUtils.showTagE("onPreviousClicked");
     }
 
@@ -107,6 +108,11 @@ public class ControlsClickListener implements AudioWidget.OnControlsClickListene
 
     @Override
     public void onNextClicked() {
+        try {
+            stub.next();
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        }
         LogUtils.showTagE("onNextClicked");
     }
 
@@ -117,6 +123,10 @@ public class ControlsClickListener implements AudioWidget.OnControlsClickListene
 
     @Override
     public void onAlbumClicked() {
+        Intent intent = new Intent(context, MainActivity.class);
+        //intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+        //intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        context.startActivity(intent);
         LogUtils.showTagE("onAlbumClicked");
     }
 

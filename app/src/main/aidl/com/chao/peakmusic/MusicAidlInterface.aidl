@@ -59,4 +59,15 @@ interface MusicAidlInterface {
       * 下一首
       */
       void next();
+
+     /**
+      * 显示悬浮控件
+      */
+      void show();
+
+     /**
+      * 隐藏悬浮控件
+      */
+      void hide();
+
 }

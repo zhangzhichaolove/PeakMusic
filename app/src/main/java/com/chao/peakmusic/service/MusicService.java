@@ -4,7 +4,9 @@ import android.app.Service;
 import android.content.Intent;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.RemoteException;
 import android.support.annotation.Nullable;
 
@@ -32,6 +34,7 @@ public class MusicService extends Service {
     public static final String EXTRAS_MUSIC = "extras_music";
     private static final String TAG = "MusicService";
     private static final long UPDATE_INTERVAL = 1000;
+    private Handler mHandler;
     private Timer timer;
 
     private AudioWidget audioWidget;
@@ -44,10 +47,10 @@ public class MusicService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        mHandler = new Handler(Looper.getMainLooper());
         audioWidget = new AudioWidget.Builder(this).build();
         controlsClickListener = new ControlsClickListener(stub, this);
         audioWidget.controller().onControlsClickListener(controlsClickListener);
-        audioWidget.show(ScreenUtils.getScreenWidth(), ScreenUtils.getScreenHeight() / 2);
         LogUtils.showTagE("服务创建");
     }
 
@@ -102,7 +105,6 @@ public class MusicService extends Service {
                 public void onPrepared(MediaPlayer mediaPlayer) {
                     mediaPlayer.start();
                     audioWidget.controller().duration(mediaPlayer.getDuration());
-                    startTrackingPosition();
                 }
             });
             //mediaPlayer.prepare();//初始化播放器MediaPlayer
@@ -127,6 +129,7 @@ public class MusicService extends Service {
     }
 
     private void startTrackingPosition() {
+        stopTrackingPosition();
         timer = new Timer(TAG);
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
@@ -215,13 +218,43 @@ public class MusicService extends Service {
         @Override
         public void pre() throws RemoteException {
             currentPosition--;
+            if (currentPosition >= 0) {
+                openAudio(currentPosition);
+            } else {
+                openAudio(music.size() - 1);
+            }
         }
 
         @Override
         public void next() throws RemoteException {
             currentPosition++;
+            if (currentPosition <= music.size()) {
+                openAudio(currentPosition);
+            } else {
+                openAudio(0);
+            }
         }
 
+        @Override
+        public void show() throws RemoteException {
+            mHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    audioWidget.show(ScreenUtils.getScreenWidth(), ScreenUtils.getScreenHeight() / 2);
+                }
+            });
+        }
+
+        @Override
+        public void hide() throws RemoteException {
+            mHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    audioWidget.collapse();
+                    audioWidget.hide();
+                }
+            });
+        }
     };
 
 }
