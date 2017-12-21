@@ -1,5 +1,7 @@
 package com.chao.peakmusic.activity;
 
+import android.os.Handler;
+
 import com.chao.peakmusic.R;
 import com.chao.peakmusic.base.BaseActivity;
 import com.chao.peakmusic.utils.NavigationManager;
@@ -10,6 +12,7 @@ import com.chao.peakmusic.utils.NavigationManager;
  */
 
 public class GuideActivity extends BaseActivity {
+    private Handler mHandler;
 
     @Override
     public int getLayout() {
@@ -18,7 +21,24 @@ public class GuideActivity extends BaseActivity {
 
     @Override
     public void initData() {
-        NavigationManager.gotoHome(mContext);
-        finish();
+        mHandler = new Handler();
+        mHandler.postDelayed(run, 2000);
+    }
+
+
+    private Runnable run = new Runnable() {
+        @Override
+        public void run() {
+            NavigationManager.gotoHome(mContext);
+            finish();
+        }
+    };
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        mHandler.removeCallbacks(run);
+        mHandler = null;
+        run = null;
     }
 }
