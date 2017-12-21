@@ -439,18 +439,19 @@ public class AudioWidget {
 
     public void collapse() {
         expandCollapseWidget.setCollapseListener(playPauseButton::setAlpha);
-
         WindowManager.LayoutParams params = (WindowManager.LayoutParams) expandCollapseWidget.getLayoutParams();
-        int cx = params.x + expandCollapseWidget.getWidth() / 2;
-        if (cx > screenSize.x / 2) {
-            expandCollapseWidget.expandDirection(ExpandCollapseWidget.DIRECTION_LEFT);
-        } else {
-            expandCollapseWidget.expandDirection(ExpandCollapseWidget.DIRECTION_RIGHT);
-        }
-        updatePlayPauseButtonPosition();
-        if (expandCollapseWidget.collapse()) {
-            playPauseButtonManager.animateToBounds();
-            expandedWidgetManager.animateToBounds(expToPpbBoundsChecker, null);
+        if (params != null) {
+            int cx = params.x + expandCollapseWidget.getWidth() / 2;
+            if (cx > screenSize.x / 2) {
+                expandCollapseWidget.expandDirection(ExpandCollapseWidget.DIRECTION_LEFT);
+            } else {
+                expandCollapseWidget.expandDirection(ExpandCollapseWidget.DIRECTION_RIGHT);
+            }
+            updatePlayPauseButtonPosition();
+            if (expandCollapseWidget.collapse()) {
+                playPauseButtonManager.animateToBounds();
+                expandedWidgetManager.animateToBounds(expToPpbBoundsChecker, null);
+            }
         }
     }
 

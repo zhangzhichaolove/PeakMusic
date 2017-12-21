@@ -8,12 +8,14 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.RemoteException;
+import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 
 import com.chao.peakmusic.MusicAidlInterface;
 import com.chao.peakmusic.listener.ControlsClickListener;
 import com.chao.peakmusic.model.SongModel;
 import com.chao.peakmusic.utils.LogUtils;
+import com.chao.peakmusic.utils.SPUtils;
 import com.chao.peakmusic.utils.ScreenUtils;
 import com.cleveroad.audiowidget.AudioWidget;
 
@@ -29,7 +31,7 @@ import java.util.TimerTask;
  * Created by Chao on 2017-12-19.
  */
 
-public class MusicService extends Service {
+public class MusicService extends Service implements AudioWidget.OnWidgetStateChangedListener {
 
     public static final String EXTRAS_MUSIC = "extras_music";
     private static final String TAG = "MusicService";
@@ -51,6 +53,7 @@ public class MusicService extends Service {
         audioWidget = new AudioWidget.Builder(this).build();
         controlsClickListener = new ControlsClickListener(stub, this);
         audioWidget.controller().onControlsClickListener(controlsClickListener);
+        audioWidget.controller().onWidgetStateChangedListener(this);
         LogUtils.showTagE("服务创建");
     }
 
@@ -78,8 +81,19 @@ public class MusicService extends Service {
 
     @Override
     public void onDestroy() {
-        super.onDestroy();
         stopTrackingPosition();
+        audioWidget.controller().onControlsClickListener(null);
+        audioWidget.controller().onWidgetStateChangedListener(null);
+        audioWidget.hide();
+        audioWidget = null;
+        if (mediaPlayer.isPlaying()) {
+            mediaPlayer.stop();
+        }
+        mediaPlayer.reset();
+        mediaPlayer.release();
+        mediaPlayer = null;
+        stopTrackingPosition();
+        super.onDestroy();
         LogUtils.showTagE("服务销毁");
     }
 
@@ -250,7 +264,7 @@ public class MusicService extends Service {
             mHandler.post(new Runnable() {
                 @Override
                 public void run() {
-                    audioWidget.show(ScreenUtils.getScreenWidth(), ScreenUtils.getScreenHeight() / 2);
+                    audioWidget.show(SPUtils.getPrefInt(SPUtils.SUSPENSIONX, ScreenUtils.getScreenWidth()), SPUtils.getPrefInt(SPUtils.SUSPENSIONY, ScreenUtils.getScreenHeight() / 2));
                 }
             });
         }
@@ -267,4 +281,14 @@ public class MusicService extends Service {
         }
     };
 
+    @Override
+    public void onWidgetStateChanged(@NonNull AudioWidget.State state) {
+
+    }
+
+    @Override
+    public void onWidgetPositionChanged(int cx, int cy) {
+        SPUtils.setPrefInt(SPUtils.SUSPENSIONX, cx);
+        SPUtils.setPrefInt(SPUtils.SUSPENSIONY, cy);
+    }
 }
