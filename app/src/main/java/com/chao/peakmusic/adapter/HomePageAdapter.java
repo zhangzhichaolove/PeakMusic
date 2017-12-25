@@ -4,8 +4,6 @@ import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentPagerAdapter;
 
-import com.chao.peakmusic.fragment.LocalMusicFragment;
-
 /**
  * Created by Chao on 2017/9/3.
  */
@@ -13,16 +11,11 @@ import com.chao.peakmusic.fragment.LocalMusicFragment;
 public class HomePageAdapter extends FragmentPagerAdapter {
     private String[] mTitles = new String[]{"本地音乐", "在线音乐"};
     private Fragment[] fragments;
-    private LocalMusicFragment localMusicFragment;
 
-    public LocalMusicFragment getLocalMusicFragment() {
-        return localMusicFragment;
-    }
 
-    public HomePageAdapter(FragmentManager fm) {
+    public HomePageAdapter(FragmentManager fm, Fragment[] fragments) {
         super(fm);
-        localMusicFragment = LocalMusicFragment.newInstance();
-        fragments = new Fragment[]{localMusicFragment, LocalMusicFragment.newInstance()};
+        this.fragments = fragments;
     }
 
     @Override
@@ -32,11 +25,12 @@ public class HomePageAdapter extends FragmentPagerAdapter {
 
     @Override
     public int getCount() {
-        return mTitles.length;
+        return fragments.length;
     }
 
     @Override
     public CharSequence getPageTitle(int position) {
         return mTitles[position];
     }
+
 }

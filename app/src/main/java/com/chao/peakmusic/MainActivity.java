@@ -14,6 +14,7 @@ import android.support.annotation.NonNull;
 import android.support.annotation.RequiresApi;
 import android.support.design.widget.NavigationView;
 import android.support.design.widget.TabLayout;
+import android.support.v4.app.Fragment;
 import android.support.v4.view.GravityCompat;
 import android.support.v4.view.ViewPager;
 import android.support.v4.widget.DrawerLayout;
@@ -49,8 +50,8 @@ import java.util.concurrent.TimeUnit;
 
 import butterknife.BindView;
 
-public class MainActivity extends BaseActivity implements NavigationView.OnNavigationItemSelectedListener, ScanningUtils.ScanningListener {
-    private static final long UPDATE_INTERVAL = 1000;
+public class MainActivity extends BaseActivity implements NavigationView.OnNavigationItemSelectedListener, ScanningUtils.ScanningListener, PlayMusicListener {
+    private static final long UPDATE_INTERVAL = 500;
     @BindView(R.id.mToolbar)
     Toolbar mToolbar;
     @BindView(R.id.tabs)
@@ -76,9 +77,9 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
     @BindView(R.id.tv_artist)
     TextView tv_artist;
     private Handler handler;
+    private Fragment[] fragments;
     private HomePageAdapter pageAdapter;
     private ScheduledExecutorService timer;
-    private LocalMusicFragment localMusicFragment;
     private ArrayList<SongModel> music;
 
     @Override
@@ -93,8 +94,8 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         setSupportActionBar(mToolbar);
         getSupportActionBar().setHomeButtonEnabled(true); //设置返回键可用
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-        pageAdapter = new HomePageAdapter(getSupportFragmentManager());
-        localMusicFragment = pageAdapter.getLocalMusicFragment();
+        fragments = new Fragment[]{LocalMusicFragment.newInstance(), LocalMusicFragment.newInstance()};
+        pageAdapter = new HomePageAdapter(getSupportFragmentManager(), fragments);
         vp_content.setAdapter(pageAdapter);
         tabs.setupWithViewPager(vp_content);
         handler = new Handler(Looper.getMainLooper());
@@ -149,7 +150,7 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
                 try {
                     if (isBackstage && mService != null) {
                         mService.hide();
-                    } else {
+                    } else if (mService != null) {
                         mService.show();
                     }
                 } catch (RemoteException e) {
@@ -157,17 +158,10 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
                 }
             }
         });
+    }
 
-        localMusicFragment.setPlayMusicListener(new PlayMusicListener() {
-            @Override
-            public void playMusic(int position) {
-                try {
-                    mService.openAudio(position);
-                } catch (RemoteException e) {
-                    e.printStackTrace();
-                }
-            }
-        });
+    public PlayMusicListener getListener() {
+        return this;
     }
 
     private TestService audioService;
@@ -285,11 +279,22 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
 
     @Override
     public void onScanningMusicComplete(ArrayList<SongModel> music) {
-        localMusicFragment.setMusic(music);
+        ((LocalMusicFragment) fragments[0]).setMusic(music);
         Intent intent = new Intent(mContext, MusicService.class);
         intent.putExtra(MusicService.EXTRAS_MUSIC, music);
         mContext.startService(intent);
         mContext.bindService(intent, conn, Context.BIND_AUTO_CREATE);
         this.music = music;
+    }
+
+    @Override
+    public void playMusic(int position) {
+        try {
+            if (mService != null) {
+                mService.openAudio(position);
+            }
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        }
     }
 }

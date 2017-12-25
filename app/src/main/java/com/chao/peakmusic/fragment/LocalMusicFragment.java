@@ -4,11 +4,13 @@ import android.os.Bundle;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 
+import com.chao.peakmusic.MainActivity;
 import com.chao.peakmusic.R;
 import com.chao.peakmusic.adapter.LocalMusicAdapter;
 import com.chao.peakmusic.base.BaseFragment;
 import com.chao.peakmusic.listener.PlayMusicListener;
 import com.chao.peakmusic.model.SongModel;
+import com.chao.peakmusic.utils.ScanningUtils;
 
 import java.util.ArrayList;
 
@@ -43,9 +45,11 @@ public class LocalMusicFragment extends BaseFragment {
     public void initView() {
         musicList.setLayoutManager(new LinearLayoutManager(mContext));
         musicList.setAdapter(adapter = new LocalMusicAdapter());
+        music = music == null ? ScanningUtils.getInstance(mContext).getMusic() : music;
         if (music != null) {
             adapter.setData(music);
         }
+        listener = ((MainActivity) getActivity()).getListener();
     }
 
     @Override
@@ -71,10 +75,4 @@ public class LocalMusicFragment extends BaseFragment {
             adapter.setData(music);
         }
     }
-
-    public void setPlayMusicListener(PlayMusicListener listener) {
-        this.listener = listener;
-    }
-
-
 }

@@ -8,6 +8,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 
 import com.chao.peakmusic.R;
+import com.chao.peakmusic.utils.BarUtils;
 import com.chao.peakmusic.widget.CustomToolbar;
 
 import butterknife.ButterKnife;
@@ -26,6 +27,7 @@ public abstract class BaseActivity extends AppCompatActivity implements BaseInte
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        BarUtils.setWindow(this);
         mContext = this;
         if (getLayout() != 0) {
             setContentView(getLayout());
