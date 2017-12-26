@@ -6,9 +6,11 @@ import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
+import android.view.ViewGroup;
 
 import com.chao.peakmusic.R;
 import com.chao.peakmusic.utils.BarUtils;
+import com.chao.peakmusic.utils.GeneralVar;
 import com.chao.peakmusic.widget.CustomToolbar;
 
 import butterknife.ButterKnife;
@@ -22,6 +24,7 @@ public abstract class BaseActivity extends AppCompatActivity implements BaseInte
     private Unbinder bind;
     protected Context mContext;
     protected CustomToolbar mToolbar;
+    View statusBarView;
 
 
     @Override
@@ -38,6 +41,14 @@ public abstract class BaseActivity extends AppCompatActivity implements BaseInte
 
     private void init() {
         mToolbar = findViewById(R.id.toolbar);
+        statusBarView = findViewById(R.id.statusBarView);
+
+        if (statusBarView != null) {
+            ViewGroup.LayoutParams statusBarLp = statusBarView.getLayoutParams();
+            statusBarLp.width = ViewGroup.LayoutParams.MATCH_PARENT;
+            statusBarLp.height = GeneralVar.getStatusHeight();
+            statusBarView.setLayoutParams(statusBarLp);
+        }
         if (mToolbar != null) {
             setSupportActionBar(mToolbar);
             mToolbar.setLeftImgOnClickListener(this);
