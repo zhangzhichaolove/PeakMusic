@@ -25,7 +25,9 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 
 import com.chao.peakmusic.activity.MusicPlayActivity;
@@ -37,6 +39,7 @@ import com.chao.peakmusic.model.SongModel;
 import com.chao.peakmusic.service.MusicService;
 import com.chao.peakmusic.service.TestService;
 import com.chao.peakmusic.utils.AppStatusListener;
+import com.chao.peakmusic.utils.GeneralVar;
 import com.chao.peakmusic.utils.ImageLoaderV4;
 import com.chao.peakmusic.utils.KeyDownUtils;
 import com.chao.peakmusic.utils.ScanningUtils;
@@ -76,6 +79,8 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
     TextView tv_title;
     @BindView(R.id.tv_artist)
     TextView tv_artist;
+    @BindView(R.id.statusBarView)
+    View statusBarView;
     private Handler handler;
     private Fragment[] fragments;
     private HomePageAdapter pageAdapter;
@@ -101,6 +106,9 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         handler = new Handler(Looper.getMainLooper());
         timer = Executors.newScheduledThreadPool(1);
         ImageLoaderV4.getInstance().loadCircle(mContext, iv_album_cover, R.drawable.default_cover);
+        RelativeLayout.LayoutParams statusBarLp =
+                new RelativeLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, GeneralVar.getStatusHeight());
+        statusBarView.setLayoutParams(statusBarLp);
         //getSupportFragmentManager().beginTransaction().add(R.id.fl_content, LocalMusicFragment.newInstance(), LocalMusicFragment.class.getName()).commit();
     }
 
