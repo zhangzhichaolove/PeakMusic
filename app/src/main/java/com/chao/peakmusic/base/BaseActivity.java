@@ -42,7 +42,6 @@ public abstract class BaseActivity extends AppCompatActivity implements BaseInte
     private void init() {
         mToolbar = findViewById(R.id.toolbar);
         statusBarView = findViewById(R.id.statusBarView);
-
         if (statusBarView != null) {
             ViewGroup.LayoutParams statusBarLp = statusBarView.getLayoutParams();
             statusBarLp.width = ViewGroup.LayoutParams.MATCH_PARENT;
