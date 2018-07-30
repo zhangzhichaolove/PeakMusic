@@ -4,6 +4,7 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
@@ -524,6 +525,22 @@ public class AudioWidget {
                         | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                 PixelFormat.TRANSLUCENT);
         params.gravity = Gravity.START | Gravity.TOP;
+
+        if (Build.VERSION.SDK_INT >= 26) {//8.0新特性
+            params.type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
+        } else if (Build.VERSION.SDK_INT >= 24) { /*android7.0不能用TYPE_TOAST*/
+            params.type = WindowManager.LayoutParams.TYPE_PHONE;
+        } else { /*以下代码块使得android6.0之后的用户不必再去手动开启悬浮窗权限*/
+            String packname = context.getPackageName();
+            PackageManager pm = context.getPackageManager();
+            boolean permission = PackageManager.PERMISSION_GRANTED == pm.checkPermission("android.permission.SYSTEM_ALERT_WINDOW", packname);
+            if (permission) {
+                params.type = WindowManager.LayoutParams.TYPE_PHONE;
+            } else {
+                params.type = WindowManager.LayoutParams.TYPE_TOAST;
+            }
+        }
+
         params.x = left;
         params.y = top;
         windowManager.addView(view, params);
