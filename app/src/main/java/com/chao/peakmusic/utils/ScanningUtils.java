@@ -11,6 +11,7 @@ import android.graphics.BitmapFactory;
 import android.media.audiofx.AudioEffect;
 import android.net.Uri;
 import android.provider.MediaStore;
+import android.util.Log;
 
 import com.chao.peakmusic.model.SongModel;
 
@@ -82,11 +83,22 @@ public class ScanningUtils {
             c = mContentResolver.query(MEDIA_URI, PROJECTIONS, WHERE, VALUE, ORDER_BY);
 
             while (c.moveToNext()) {
+
+                //c.getColumnNames();
+
                 String path = c.getString(c.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA));// 路径
 
                 if (!isExists(path)) {
                     continue;
                 }
+
+//                String name = c.getString(c.getColumnIndexOrThrow(MediaStore.Audio.Media.DISPLAY_NAME)); // 歌曲名
+//                String title = c.getString(c.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)); // 歌曲名
+//                String album = c.getString(c.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)); // 专辑
+//                long albumId = c.getLong(c.getColumnIndex(MediaStore.Audio.AudioColumns.ALBUM_ID));// 专辑封面id，根据该id可以获得专辑封面图片
+//                String artist = c.getString(c.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)); // 作者
+//                long size = c.getLong(c.getColumnIndexOrThrow(MediaStore.Audio.Media.SIZE));// 大小
+//                int duration = c.getInt(c.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION));// 时长
 
                 String name = c.getString(c.getColumnIndexOrThrow(MediaStore.Audio.Media.DISPLAY_NAME)); // 歌曲名
                 String title = c.getString(c.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)); // 歌曲名
@@ -95,16 +107,19 @@ public class ScanningUtils {
                 String artist = c.getString(c.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)); // 作者
                 long size = c.getLong(c.getColumnIndexOrThrow(MediaStore.Audio.Media.SIZE));// 大小
                 int duration = c.getInt(c.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION));// 时长
+
+
                 //int id = c.getInt(c.getColumnIndexOrThrow(MediaStore.Images.Media._ID));// 歌曲的id
                 // int albumId = c.getInt(c.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID));
-                if (duration > 10 * 1000 && name.endsWith(".mp3")) {
-                    SongModel music = new SongModel(artist, name, album, albumId, path, duration, size);
-                    musics.add(music);
-                }
+                //if (duration > 10 * 1000 && name.endsWith(".mp3")) {
+                SongModel music = new SongModel(artist, name, album, albumId, path, duration, size);
+                musics.add(music);
+                //}
             }
 
         } catch (Exception e) {
             e.printStackTrace();
+            Log.e("ScanningUtils", e.toString());
         } finally {
             if (c != null) {
                 c.close();
