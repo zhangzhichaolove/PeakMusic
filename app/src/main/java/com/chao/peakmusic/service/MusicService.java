@@ -231,7 +231,7 @@ public class MusicService extends Service implements AudioWidget.OnWidgetStateCh
 
         @Override
         public long getDuration() throws RemoteException {
-            return currentMusic.getDuration();
+            return mediaPlayer.getDuration();
         }
 
         @Override

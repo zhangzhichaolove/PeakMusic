@@ -251,13 +251,16 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
                     public void run() {
                         System.out.println(new SimpleDateFormat("yyyy-MM-dd hh:mm:ss").format(new Date()));
                         try {
-                            if (music == null || mService == null || mService.getCurrentIndex() == -1) {
+                            if (mService == null || !mService.isPlay()) {
                                 return;
                             }
-                            SongModel model = music.get(mService.getCurrentIndex());
-                            tv_title.setText(model.getSong());
-                            tv_artist.setText(model.getSinger());
-                            pb_play_bar.setMax(model.getDuration());
+//                            if (music == null || mService == null || mService.getCurrentIndex() == -1) {
+//                                return;
+//                            }
+//                            SongModel model = music.get(mService.getCurrentIndex());
+//                            tv_title.setText(model.getSong());
+//                            tv_artist.setText(model.getSinger());
+                            pb_play_bar.setMax((int) mService.getDuration());
                             pb_play_bar.setProgress(mService.getCurrentPosition());
                         } catch (RemoteException e) {
                             e.printStackTrace();
