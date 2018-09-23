@@ -17,6 +17,7 @@ import com.chao.peakmusic.model.SongModel;
 import com.chao.peakmusic.utils.LogUtils;
 import com.chao.peakmusic.utils.SPUtils;
 import com.chao.peakmusic.utils.ScreenUtils;
+import com.chao.peakmusic.utils.ToastUtils;
 import com.cleveroad.audiowidget.AudioWidget;
 
 import java.io.File;
@@ -188,8 +189,17 @@ public class MusicService extends Service implements AudioWidget.OnWidgetStateCh
         }
 
         @Override
+        public void playAudio(String url) throws RemoteException {
+            currentPosition = -1;
+            playMusic(url);
+            if (!controlsClickListener.isPlaying()) {
+                audioWidget.controller().start();
+            }
+        }
+
+        @Override
         public void play() throws RemoteException {
-            if (mediaPlayer != null && currentMusic != null) {
+            if (mediaPlayer != null/* && currentMusic != null*/) {
                 mediaPlayer.start();
             } else if (mediaPlayer == null) {
                 openAudio(0);
@@ -246,21 +256,29 @@ public class MusicService extends Service implements AudioWidget.OnWidgetStateCh
 
         @Override
         public void pre() throws RemoteException {
-            currentPosition--;
-            if (currentPosition >= 0) {
-                openAudio(currentPosition);
+            if (music != null && music.size() > 0) {
+                currentPosition--;
+                if (currentPosition >= 0) {
+                    openAudio(currentPosition);
+                } else {
+                    openAudio(music.size() - 1);
+                }
             } else {
-                openAudio(music.size() - 1);
+                ToastUtils.showToast("没有更多歌曲了~");
             }
         }
 
         @Override
         public void next() throws RemoteException {
-            currentPosition++;
-            if (currentPosition <= music.size() - 1) {
-                openAudio(currentPosition);
+            if (music != null && music.size() > 0) {
+                currentPosition++;
+                if (currentPosition <= music.size() - 1) {
+                    openAudio(currentPosition);
+                } else {
+                    openAudio(0);
+                }
             } else {
-                openAudio(0);
+                ToastUtils.showToast("没有更多歌曲了~");
             }
         }
 

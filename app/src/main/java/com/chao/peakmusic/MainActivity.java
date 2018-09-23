@@ -32,6 +32,7 @@ import com.chao.peakmusic.activity.MusicPlayActivity;
 import com.chao.peakmusic.adapter.HomePageAdapter;
 import com.chao.peakmusic.base.BaseActivity;
 import com.chao.peakmusic.fragment.LocalMusicFragment;
+import com.chao.peakmusic.fragment.OnLineMusicFragment;
 import com.chao.peakmusic.listener.PlayMusicListener;
 import com.chao.peakmusic.model.SongModel;
 import com.chao.peakmusic.service.MusicService;
@@ -94,7 +95,7 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         setSupportActionBar(mToolbar);
         getSupportActionBar().setHomeButtonEnabled(true); //设置返回键可用
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-        fragments = new Fragment[]{LocalMusicFragment.newInstance(), LocalMusicFragment.newInstance()};
+        fragments = new Fragment[]{OnLineMusicFragment.newInstance(), LocalMusicFragment.newInstance()};
         pageAdapter = new HomePageAdapter(getSupportFragmentManager(), fragments);
         vp_content.setAdapter(pageAdapter);
         tabs.setupWithViewPager(vp_content);
@@ -212,8 +213,31 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
                 startActivity(intent, ActivityOptions.makeSceneTransitionAnimation(this, iv_album_cover, "album").toBundle());
                 break;
             case R.id.iv_play:
+                if (mService != null) {
+                    if (iv_play.isSelected()) {
+                        try {
+                            mService.pause();
+                        } catch (RemoteException e) {
+                            e.printStackTrace();
+                        }
+                    } else {
+                        try {
+                            mService.play();
+                        } catch (RemoteException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                    iv_play.setSelected(!iv_play.isSelected());
+                }
                 break;
             case R.id.iv_next:
+                if (mService != null) {
+                    try {
+                        mService.next();
+                    } catch (RemoteException e) {
+                        e.printStackTrace();
+                    }
+                }
                 break;
         }
     }
@@ -279,7 +303,7 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
 
     @Override
     public void onScanningMusicComplete(ArrayList<SongModel> music) {
-        ((LocalMusicFragment) fragments[0]).setMusic(music);
+        ((LocalMusicFragment) fragments[1]).setMusic(music);
         Intent intent = new Intent(mContext, MusicService.class);
         intent.putExtra(MusicService.EXTRAS_MUSIC, music);
         mContext.startService(intent);
@@ -288,10 +312,29 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
     }
 
     @Override
-    public void playMusic(int position) {
+    public void playMusic(int position, String name, String artist) {
+        iv_play.setSelected(true);
+        tv_title.setText(name);
+        tv_artist.setText(artist);
+        ImageLoaderV4.getInstance().loadCircle(mContext, iv_album_cover, R.drawable.default_cover);
         try {
             if (mService != null) {
                 mService.openAudio(position);
+            }
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void playMusic(String url, String name, String artist, String img) {
+        iv_play.setSelected(true);
+        tv_title.setText(name);
+        tv_artist.setText(artist);
+        ImageLoaderV4.getInstance().loadCircle(mContext, iv_album_cover, img);
+        try {
+            if (mService != null) {
+                mService.playAudio(url);
             }
         } catch (RemoteException e) {
             e.printStackTrace();

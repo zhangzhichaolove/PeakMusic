@@ -15,6 +15,7 @@ import com.chao.peakmusic.widget.CustomToolbar;
 
 import butterknife.ButterKnife;
 import butterknife.Unbinder;
+import io.reactivex.disposables.CompositeDisposable;
 
 /**
  * Created by Chao on 2017-12-18.
@@ -24,6 +25,7 @@ public abstract class BaseActivity extends AppCompatActivity implements BaseInte
     private Unbinder bind;
     protected Context mContext;
     protected CustomToolbar mToolbar;
+    protected CompositeDisposable disposables;
     View statusBarView;
 
 
@@ -32,6 +34,7 @@ public abstract class BaseActivity extends AppCompatActivity implements BaseInte
         super.onCreate(savedInstanceState);
         BarUtils.setWindow(this);
         mContext = this;
+        disposables = new CompositeDisposable();
         if (getLayout() != 0) {
             setContentView(getLayout());
         }
@@ -63,6 +66,7 @@ public abstract class BaseActivity extends AppCompatActivity implements BaseInte
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        disposables.clear();
         bind.unbind();
     }
 

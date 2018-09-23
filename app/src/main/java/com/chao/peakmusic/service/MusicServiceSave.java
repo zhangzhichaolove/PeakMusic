@@ -167,6 +167,15 @@ public class MusicServiceSave extends Service {
         }
 
         @Override
+        public void playAudio(String url) throws RemoteException {
+            currentPosition = -1;
+            playMusic(url);
+            if (!controlsClickListener.isPlaying()) {
+                audioWidget.controller().start();
+            }
+        }
+
+        @Override
         public void play() throws RemoteException {
             if (mediaPlayer != null && currentMusic != null) {
                 mediaPlayer.start();

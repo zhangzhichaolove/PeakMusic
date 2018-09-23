@@ -9,6 +9,10 @@ interface MusicAidlInterface {
       * 打开一个音频文件
       */
       void openAudio(int position);
+  /**
+      * 打开一个音频文件
+      */
+      void playAudio(String url);
 
      /**
       * 播放

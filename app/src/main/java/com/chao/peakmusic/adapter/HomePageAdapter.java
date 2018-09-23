@@ -9,7 +9,7 @@ import android.support.v4.app.FragmentPagerAdapter;
  */
 
 public class HomePageAdapter extends FragmentPagerAdapter {
-    private String[] mTitles = new String[]{"本地音乐", "在线音乐"};
+    private String[] mTitles = new String[]{"在线音乐", "本地音乐"};
     private Fragment[] fragments;
 
 

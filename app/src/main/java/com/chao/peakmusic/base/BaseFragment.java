@@ -10,6 +10,7 @@ import android.view.ViewGroup;
 
 import butterknife.ButterKnife;
 import butterknife.Unbinder;
+import io.reactivex.disposables.CompositeDisposable;
 
 /**
  * Created by Chao on 2017-12-18.
@@ -18,6 +19,7 @@ import butterknife.Unbinder;
 public abstract class BaseFragment extends Fragment implements BaseInterFace {
     protected Context mContext;
     protected View rootView;
+    protected CompositeDisposable disposables;
     private Unbinder bind;
 
     @Override
@@ -30,12 +32,10 @@ public abstract class BaseFragment extends Fragment implements BaseInterFace {
     @Override
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         rootView = inflater.inflate(getLayout(), container, false);
-        ButterKnife.bind(this, rootView);
+        bind = ButterKnife.bind(this, rootView);
+        disposables = new CompositeDisposable();
         init();
         return rootView;
-    }
-
-    protected void initPresenter() {
     }
 
     private void init() {
@@ -62,5 +62,6 @@ public abstract class BaseFragment extends Fragment implements BaseInterFace {
         if (bind != null) {
             bind.unbind();
         }
+        disposables.clear();
     }
 }

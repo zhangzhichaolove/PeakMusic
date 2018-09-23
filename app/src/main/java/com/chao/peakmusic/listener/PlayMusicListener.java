@@ -6,5 +6,7 @@ package com.chao.peakmusic.listener;
 
 public interface PlayMusicListener {
 
-    public void playMusic(int position);
+    public void playMusic(int position, String name, String artist);
+
+    public void playMusic(String url, String name, String artist, String img);
 }
