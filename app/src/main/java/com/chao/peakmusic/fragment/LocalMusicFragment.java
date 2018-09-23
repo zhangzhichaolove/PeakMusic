@@ -63,7 +63,7 @@ public class LocalMusicFragment extends BaseFragment {
             @Override
             public void itemClickListener(int position) {
                 if (listener != null) {
-                    listener.playMusic(position, music.get(position).getSong(), music.get(position).getSinger());
+                    listener.playMusic(position, music.get(position).getSong(), music.get(position).getAlbum());
                 }
             }
         });
