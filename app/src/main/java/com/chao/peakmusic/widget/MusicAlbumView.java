@@ -10,7 +10,7 @@ import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.BitmapDrawable;
-import android.support.annotation.Nullable;
+import androidx.annotation.Nullable;
 import android.util.AttributeSet;
 import android.view.WindowManager;
 
@@ -22,7 +22,7 @@ import com.chao.peakmusic.utils.FormatDrawable;
  * Created by Chao on 2017-12-17.
  */
 
-public class MusicAlbumView extends android.support.v7.widget.AppCompatImageView {
+public class MusicAlbumView extends androidx.appcompat.widget.AppCompatImageView {
     private Paint paint;
     private int radiusWidth = 80;
     private int strokeWidth = dp2px(radiusWidth * 2 / 3);

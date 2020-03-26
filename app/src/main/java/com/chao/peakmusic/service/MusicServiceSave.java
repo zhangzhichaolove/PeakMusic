@@ -8,7 +8,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.RemoteException;
-import android.support.annotation.Nullable;
+import androidx.annotation.Nullable;
 
 import com.chao.peakmusic.MusicAidlInterface;
 import com.chao.peakmusic.listener.ControlsClickListener;

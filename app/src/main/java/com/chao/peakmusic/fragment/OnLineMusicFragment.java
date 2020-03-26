@@ -1,8 +1,8 @@
 package com.chao.peakmusic.fragment;
 
 import android.os.Bundle;
-import android.support.v7.widget.LinearLayoutManager;
-import android.support.v7.widget.RecyclerView;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.chao.peakmusic.MainActivity;
 import com.chao.peakmusic.R;

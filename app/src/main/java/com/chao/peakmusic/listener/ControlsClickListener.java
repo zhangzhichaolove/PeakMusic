@@ -61,10 +61,9 @@ public class ControlsClickListener implements AudioWidget.OnControlsClickListene
     }
 
     @Override
-    public boolean onPlayPauseClicked(boolean isPlay) {
-        isPlaying = isPlay;
+    public boolean onPlayPauseClicked() {
         try {
-            if (isPlay) {
+            if (isPlaying = stub.isPlay()) {
                 stub.play();
             } else {
                 stub.pause();
@@ -72,9 +71,24 @@ public class ControlsClickListener implements AudioWidget.OnControlsClickListene
         } catch (RemoteException e) {
             e.printStackTrace();
         }
-        LogUtils.showTagE("TAG:" + isPlay);
-        return false;
+        return true;
     }
+
+//    @Override
+//    public boolean onPlayPauseClicked(boolean isPlay) {
+//        isPlaying = isPlay;
+//        try {
+//            if (isPlay) {
+//                stub.play();
+//            } else {
+//                stub.pause();
+//            }
+//        } catch (RemoteException e) {
+//            e.printStackTrace();
+//        }
+//        LogUtils.showTagE("TAG:" + isPlay);
+//        return false;
+//    }
 
 
 //    @Override

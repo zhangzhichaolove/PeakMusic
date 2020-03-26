@@ -13,18 +13,18 @@
         android:background="@color/colorPrimaryDark"
         android:fitsSystemWindows="true"></View>
 
-    <android.support.design.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    <androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:app="http://schemas.android.com/apk/res-auto"
         android:id="@+id/main_content"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_below="@id/statusBarView">
 
-        <android.support.design.widget.AppBarLayout
+        <com.google.android.material.appbar.AppBarLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content">
 
-            <android.support.v7.widget.Toolbar
+            <androidx.appcompat.widget.Toolbar
                 android:id="@+id/mToolbar"
                 android:layout_width="match_parent"
                 android:layout_height="?attr/actionBarSize"
@@ -36,7 +36,7 @@
                 app:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar" />
 
 
-            <android.support.design.widget.TabLayout
+            <com.google.android.material.tabs.TabLayout
                 android:id="@+id/tabs"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -47,12 +47,12 @@
                 app:tabIndicatorHeight="2dp"
                 app:tabMode="fixed"
                 app:tabSelectedTextColor="@color/red"
-                app:tabTextColor="@color/white"></android.support.design.widget.TabLayout>
+                app:tabTextColor="@color/white"></com.google.android.material.tabs.TabLayout>
 
-        </android.support.design.widget.AppBarLayout>
+        </com.google.android.material.appbar.AppBarLayout>
 
 
-        <android.support.v4.view.ViewPager
+        <androidx.viewpager.widget.ViewPager
             android:id="@+id/vp_content"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
@@ -60,7 +60,7 @@
             app:layout_behavior="@string/appbar_scrolling_view_behavior" />
 
 
-    </android.support.design.widget.CoordinatorLayout>
+    </androidx.coordinatorlayout.widget.CoordinatorLayout>
 
 
     <!--    <com.chao.peakmusic.widget.CustomToolbar
