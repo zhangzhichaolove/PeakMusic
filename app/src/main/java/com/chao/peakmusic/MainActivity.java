@@ -5,21 +5,27 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.RemoteException;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
+
 import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.tabs.TabLayout;
+
 import androidx.fragment.app.Fragment;
 import androidx.core.view.GravityCompat;
 import androidx.viewpager.widget.ViewPager;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.appcompat.app.ActionBarDrawerToggle;
 import androidx.appcompat.widget.Toolbar;
+
+import android.provider.Settings;
 import android.view.KeyEvent;
 import android.view.MenuItem;
 import android.view.View;
@@ -53,6 +59,7 @@ import butterknife.BindView;
 
 public class MainActivity extends BaseActivity implements NavigationView.OnNavigationItemSelectedListener, ScanningUtils.ScanningListener, PlayMusicListener {
     private static final long UPDATE_INTERVAL = 500;
+    private static final int OVERLAY_PERMISSION_REQ_CODE = 66;
     @BindView(R.id.mToolbar)
     Toolbar mToolbar;
     @BindView(R.id.tabs)
@@ -113,6 +120,27 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
             onScanningMusicComplete(ScanningUtils.getInstance(mContext).getMusic());
         }
         startTrackingPosition();
+        requestPermission();
+    }
+
+    /**
+     * 请求悬浮权限
+     */
+    void requestPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName()));
+            startActivityForResult(intent, OVERLAY_PERMISSION_REQ_CODE);
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == OVERLAY_PERMISSION_REQ_CODE) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && Settings.canDrawOverlays(this)) {
+
+            }
+        }
     }
 
     @Override
@@ -144,21 +172,26 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         startService(intent);
         bindService(intent, conns, Context.BIND_AUTO_CREATE);
         //unbindService(connection);
-
-        AppStatusListener.getInstance().setAppLifecycle(new AppStatusListener.AppLifecycle() {
-            @Override
-            public void AppBackstage(boolean isBackstage) {
-                try {
-                    if (isBackstage && mService != null) {
-                        mService.hide();
-                    } else if (mService != null) {
-                        mService.show();
-                    }
-                } catch (RemoteException e) {
-                    e.printStackTrace();
-                }
-            }
-        });
+//        AppStatusListener.getInstance().setAppLifecycle(new AppStatusListener.AppLifecycle() {
+//            @Override
+//            public void AppBackstage(boolean isBackstage) {
+//                try {
+//                    if (isBackstage && mService != null) {//App切换到前台隐藏悬浮。
+//                        mService.hide();
+//                    } else if (mService != null) {
+//                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+//                            if (Settings.canDrawOverlays(MainActivity.this)) {//已有悬浮权限
+//                                mService.show();
+//                            }
+//                        } else {//低版本直接显示
+//                            mService.show();
+//                        }
+//                    }
+//                } catch (RemoteException e) {
+//                    e.printStackTrace();
+//                }
+//            }
+//        });
     }
 
     public PlayMusicListener getListener() {
@@ -242,6 +275,9 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         }
     }
 
+    /**
+     * 开启定时器，动态获取服务中的歌曲信息。
+     */
     private void startTrackingPosition() {
         timer.scheduleAtFixedRate(new Runnable() {
             @Override
@@ -249,7 +285,7 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
                 handler.post(new Runnable() {
                     @Override
                     public void run() {
-                        System.out.println(new SimpleDateFormat("yyyy-MM-dd hh:mm:ss").format(new Date()));
+                        //System.out.println(new SimpleDateFormat("yyyy-MM-dd hh:mm:ss").format(new Date()));
                         try {
                             if (mService == null || !mService.isPlay()) {
                                 return;
@@ -285,6 +321,11 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         public void onServiceConnected(ComponentName name, IBinder binder) {
             //这里我们实例化audioService,通过binder来实现
             mService = MusicAidlInterface.Stub.asInterface(binder);
+            try {
+                mService.show();
+            } catch (RemoteException e) {
+                e.printStackTrace();
+            }
         }
     };
 

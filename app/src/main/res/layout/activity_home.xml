@@ -42,10 +42,13 @@
                 android:layout_height="wrap_content"
                 android:layout_below="@id/mToolbar"
                 android:background="@color/colorPrimary"
+                android:stateListAnimator="@null"
+                app:tabBackground="@android:color/transparent"
                 app:tabGravity="fill"
                 app:tabIndicatorColor="@color/red"
                 app:tabIndicatorHeight="2dp"
                 app:tabMode="fixed"
+                app:tabRippleColor="@android:color/transparent"
                 app:tabSelectedTextColor="@color/red"
                 app:tabTextColor="@color/white"></com.google.android.material.tabs.TabLayout>
 

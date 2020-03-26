@@ -8,6 +8,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.RemoteException;
+
 import androidx.annotation.Nullable;
 
 import com.chao.peakmusic.MusicAidlInterface;
@@ -138,7 +139,7 @@ public class MusicServiceSave extends Service {
                 handler.post(new Runnable() {
                     @Override
                     public void run() {
-                        System.out.println(new SimpleDateFormat("yyyy-MM-dd hh:mm:ss").format(new Date()));
+                        //System.out.println(new SimpleDateFormat("yyyy-MM-dd hh:mm:ss").format(new Date()));
                         AudioWidget widget = audioWidget;
                         MediaPlayer player = mediaPlayer;
                         if (widget != null) {
@@ -161,7 +162,7 @@ public class MusicServiceSave extends Service {
             currentMusic = music.get(position);
             currentPosition = position;
             playMusic(music.get(position).getPath()/*"/storage/emulated/0/Download/What are words.mp3"*/);
-            if (!controlsClickListener.isPlaying()) {
+            if (!this.isPlay()) {
                 audioWidget.controller().start();
             }
         }
@@ -170,30 +171,30 @@ public class MusicServiceSave extends Service {
         public void playAudio(String url) throws RemoteException {
             currentPosition = -1;
             playMusic(url);
-            if (!controlsClickListener.isPlaying()) {
+            if (!this.isPlay()) {
                 audioWidget.controller().start();
             }
         }
 
         @Override
         public void play() throws RemoteException {
-            if (mediaPlayer != null && currentMusic != null) {
-                mediaPlayer.start();
-            } else if (mediaPlayer == null) {
-                openAudio(0);
-            }
-            if (!controlsClickListener.isPlaying()) {
+            if (!this.isPlay()) {
                 audioWidget.controller().start();
+                if (mediaPlayer != null && currentMusic != null) {
+                    mediaPlayer.start();
+                } else if (mediaPlayer == null) {
+                    openAudio(0);
+                }
             }
         }
 
         @Override
         public void pause() throws RemoteException {
-            if (mediaPlayer != null) {
-                mediaPlayer.pause();
-            }
-            if (controlsClickListener.isPlaying()) {
+            if (this.isPlay()) {
                 audioWidget.controller().pause();
+                if (mediaPlayer != null) {
+                    mediaPlayer.pause();
+                }
             }
             stopTrackingPosition();
         }

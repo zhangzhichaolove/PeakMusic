@@ -16,20 +16,20 @@ import com.cleveroad.audiowidget.AudioWidget;
 public class ControlsClickListener implements AudioWidget.OnControlsClickListener {
     MusicAidlInterface.Stub stub;
     Context context;
-    boolean isPlaying = false;//默认暂停
+//    boolean isPlaying = false;//默认暂停
 
     public ControlsClickListener(MusicAidlInterface.Stub stub, Context context) {
         this.stub = stub;
         this.context = context;
     }
 
-    public void setPlaying(boolean playing) {
-        isPlaying = playing;
-    }
-
-    public boolean isPlaying() {
-        return isPlaying;
-    }
+//    public void setPlaying(boolean playing) {
+//        isPlaying = playing;
+//    }
+//
+//    public boolean isPlaying() {
+//        return isPlaying;
+//    }
 
     /**
      * 播放列表
@@ -63,15 +63,16 @@ public class ControlsClickListener implements AudioWidget.OnControlsClickListene
     @Override
     public boolean onPlayPauseClicked() {
         try {
-            if (isPlaying = stub.isPlay()) {
-                stub.play();
-            } else {
+            if (stub.isPlay()) {
                 stub.pause();
+            } else {
+                stub.play();
             }
         } catch (RemoteException e) {
             e.printStackTrace();
+            return true;
         }
-        return true;
+        return false;
     }
 
 //    @Override

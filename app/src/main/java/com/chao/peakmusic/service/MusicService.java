@@ -4,12 +4,15 @@ import android.app.Service;
 import android.content.Intent;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
+import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.RemoteException;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
 
 import com.chao.peakmusic.MusicAidlInterface;
 import com.chao.peakmusic.listener.ControlsClickListener;
@@ -22,6 +25,7 @@ import com.cleveroad.audiowidget.AudioWidget;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -71,6 +75,7 @@ public class MusicService extends Service implements AudioWidget.OnWidgetStateCh
     @Override
     public IBinder onBind(Intent intent) {
         LogUtils.showTagE("服务绑定");
+        audioWidget.controller().stop();
         return stub;
     }
 
@@ -104,6 +109,7 @@ public class MusicService extends Service implements AudioWidget.OnWidgetStateCh
      * @param currentPath 音乐文件路径
      */
     private void playMusic(String currentPath) {
+        currentPath = "https://peakchao.com/xinyang.mp3";
         try {
             if (mediaPlayer == null) {
                 mediaPlayer = new MediaPlayer();
@@ -112,6 +118,7 @@ public class MusicService extends Service implements AudioWidget.OnWidgetStateCh
                     @Override
                     public void onPrepared(MediaPlayer mediaPlayer) {
                         mediaPlayer.start();
+                        //audioWidget.controller().start();
                         audioWidget.controller().duration(mediaPlayer.getDuration());
                     }
                 });
@@ -183,39 +190,65 @@ public class MusicService extends Service implements AudioWidget.OnWidgetStateCh
             currentMusic = music.get(position);
             currentPosition = position;
             playMusic(music.get(position).getPath()/*"/storage/emulated/0/Download/What are words.mp3"*/);
-            if (!controlsClickListener.isPlaying()) {
-                audioWidget.controller().start();
-            }
+//            if (!this.isPlay()) {
+//                audioWidget.controller().start();
+//            }
         }
 
         @Override
         public void playAudio(String url) throws RemoteException {
             currentPosition = -1;
             playMusic(url);
-            if (!controlsClickListener.isPlaying()) {
-                audioWidget.controller().start();
-            }
+//            if (!this.isPlay()) {
+//                audioWidget.controller().start();
+//            }
         }
 
         @Override
         public void play() throws RemoteException {
-            if (mediaPlayer != null/* && currentMusic != null*/) {
-                mediaPlayer.start();
-            } else if (mediaPlayer == null) {
-                openAudio(0);
-            }
-            if (!controlsClickListener.isPlaying()) {
+            if (!this.isPlay()) {
+                if (mediaPlayer != null/* && currentMusic != null*/) {
+                    mediaPlayer.start();
+                } else if (mediaPlayer == null) {
+                    openAudio(0);
+                }
+                setPlayState(1);
                 audioWidget.controller().start();
             }
         }
 
         @Override
         public void pause() throws RemoteException {
+//            if (this.isPlay()) {
             if (mediaPlayer != null) {
                 mediaPlayer.pause();
-            }
-            if (controlsClickListener.isPlaying()) {
+                setPlayState(2);
                 audioWidget.controller().pause();
+            }
+//            }
+        }
+
+        /**
+         * 反射设置控件当前状态
+         * @param state
+         */
+        void setPlayState(int state) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                try {
+                    //    static final int STATE_STOPPED = 0;
+                    //    static final int STATE_PLAYING = 1;
+                    //    static final int STATE_PAUSED = 2;
+                    Field playbackState = audioWidget.getClass().getDeclaredField("playbackState");
+                    playbackState.setAccessible(true);
+                    Class<?> aClass = Class.forName("com.cleveroad.audiowidget.PlaybackState");
+                    Field state1 = aClass.getDeclaredField("state");
+                    state1.setAccessible(true);
+                    state1.set(playbackState.get(audioWidget), state);
+                    state1.setAccessible(false);
+                    playbackState.setAccessible(false);
+                } catch (NoSuchFieldException | IllegalAccessException | ClassNotFoundException e) {
+                    e.printStackTrace();
+                }
             }
         }
 
@@ -306,7 +339,7 @@ public class MusicService extends Service implements AudioWidget.OnWidgetStateCh
 
     @Override
     public void onWidgetStateChanged(@NonNull AudioWidget.State state) {
-
+        LogUtils.showTagE(state);
     }
 
     @Override
