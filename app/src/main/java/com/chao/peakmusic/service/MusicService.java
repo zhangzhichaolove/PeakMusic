@@ -12,8 +12,8 @@ import android.os.RemoteException;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.annotation.RequiresApi;
 
+import com.chao.peakmusic.ActivityCall;
 import com.chao.peakmusic.MusicAidlInterface;
 import com.chao.peakmusic.listener.ControlsClickListener;
 import com.chao.peakmusic.model.SongModel;
@@ -43,13 +43,15 @@ public class MusicService extends Service implements AudioWidget.OnWidgetStateCh
     private static final long UPDATE_INTERVAL = 1000;
     private Handler mHandler;
     private Timer timer;
+    private ActivityCall activityCall;
 
     private AudioWidget audioWidget;
-    private MediaPlayer mediaPlayer;
+    private MediaPlayer mediaPlayer = null;
     private ControlsClickListener controlsClickListener;
     private ArrayList<SongModel> music;
     private SongModel currentMusic;
     private int currentPosition = -1;
+    private boolean isPlaying = false;
 
     @Override
     public void onCreate() {
@@ -59,6 +61,7 @@ public class MusicService extends Service implements AudioWidget.OnWidgetStateCh
         controlsClickListener = new ControlsClickListener(stub, this);
         audioWidget.controller().onControlsClickListener(controlsClickListener);
         audioWidget.controller().onWidgetStateChangedListener(this);
+        //audioWidget.controller().stop();
         LogUtils.showTagE("服务创建");
     }
 
@@ -75,7 +78,6 @@ public class MusicService extends Service implements AudioWidget.OnWidgetStateCh
     @Override
     public IBinder onBind(Intent intent) {
         LogUtils.showTagE("服务绑定");
-        audioWidget.controller().stop();
         return stub;
     }
 
@@ -92,12 +94,14 @@ public class MusicService extends Service implements AudioWidget.OnWidgetStateCh
         audioWidget.controller().onWidgetStateChangedListener(null);
         audioWidget.hide();
         audioWidget = null;
-        if (mediaPlayer.isPlaying()) {
-            mediaPlayer.stop();
+        if (mediaPlayer != null) {
+            if (mediaPlayer.isPlaying()) {
+                mediaPlayer.stop();
+            }
+            mediaPlayer.reset();
+            mediaPlayer.release();
+            mediaPlayer = null;
         }
-        mediaPlayer.reset();
-        mediaPlayer.release();
-        mediaPlayer = null;
         stopTrackingPosition();
         super.onDestroy();
         LogUtils.showTagE("服务销毁");
@@ -109,11 +113,16 @@ public class MusicService extends Service implements AudioWidget.OnWidgetStateCh
      * @param currentPath 音乐文件路径
      */
     private void playMusic(String currentPath) {
-        currentPath = "https://peakchao.com/xinyang.mp3";
+        currentPath = "http://data.apiopen.top/%E8%A2%81%E7%BB%B4%E5%A8%85-%E8%AF%B4%E6%95%A3%E5%B0%B1%E6%95%A3.mp3";
         try {
             if (mediaPlayer == null) {
                 mediaPlayer = new MediaPlayer();
                 mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
+                mediaPlayer.setOnErrorListener((mp, what, extra) -> {
+                    isPlaying = false;
+                    //audioWidget.controller().stop();
+                    return false;
+                });
                 mediaPlayer.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
                     @Override
                     public void onPrepared(MediaPlayer mediaPlayer) {
@@ -141,6 +150,7 @@ public class MusicService extends Service implements AudioWidget.OnWidgetStateCh
             mediaPlayer.setLooping(false);//设置为循环播放
             //mediaPlayer.prepare();//初始化播放器MediaPlayer
             mediaPlayer.prepareAsync();//异步初始化播放器MediaPlayer
+            isPlaying = true;
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -190,42 +200,38 @@ public class MusicService extends Service implements AudioWidget.OnWidgetStateCh
             currentMusic = music.get(position);
             currentPosition = position;
             playMusic(music.get(position).getPath()/*"/storage/emulated/0/Download/What are words.mp3"*/);
-//            if (!this.isPlay()) {
-//                audioWidget.controller().start();
-//            }
         }
 
         @Override
         public void playAudio(String url) throws RemoteException {
             currentPosition = -1;
             playMusic(url);
-//            if (!this.isPlay()) {
-//                audioWidget.controller().start();
-//            }
         }
 
         @Override
         public void play() throws RemoteException {
-            if (!this.isPlay()) {
-                if (mediaPlayer != null/* && currentMusic != null*/) {
-                    mediaPlayer.start();
-                } else if (mediaPlayer == null) {
-                    openAudio(0);
-                }
-                setPlayState(1);
-                audioWidget.controller().start();
+            if (mediaPlayer != null/* && currentMusic != null*/) {
+                mediaPlayer.start();
+                isPlaying = true;
+            } else if (mediaPlayer == null) {
+                openAudio(0);
+            }
+            //悬浮按钮点击播放触发此方法，同步状态到外部UI。
+            if (activityCall != null) {
+                activityCall.call(isPlaying);
             }
         }
 
         @Override
         public void pause() throws RemoteException {
-//            if (this.isPlay()) {
             if (mediaPlayer != null) {
                 mediaPlayer.pause();
-                setPlayState(2);
-                audioWidget.controller().pause();
+                isPlaying = false;
             }
-//            }
+            //悬浮按钮点击暂停触发此方法，同步状态到外部UI。
+            if (activityCall != null) {
+                activityCall.call(isPlaying);
+            }
         }
 
         /**
@@ -259,7 +265,7 @@ public class MusicService extends Service implements AudioWidget.OnWidgetStateCh
 
         @Override
         public boolean isPlay() throws RemoteException {
-            return mediaPlayer != null && mediaPlayer.isPlaying();
+            return mediaPlayer != null && mediaPlayer.isPlaying();//isPlaying;
         }
 
         @Override
@@ -335,6 +341,44 @@ public class MusicService extends Service implements AudioWidget.OnWidgetStateCh
                 }
             });
         }
+
+        @Override
+        public void registerCallback(ActivityCall call) throws RemoteException {
+            MusicService.this.activityCall = call;
+        }
+
+        /**
+         *点击外部按钮控制播放状态时，对悬浮按钮状态进行同步。
+         */
+        @Override
+        public void clickButton(boolean isPlay) throws RemoteException {
+            if (isPlay) {
+                audioWidget.controller().start();
+            } else {
+                audioWidget.controller().pause();
+            }
+        }
+/**
+ * 通过反射调用PlayPauseButton的onClick方法
+ */
+//        @RequiresApi(api = Build.VERSION_CODES.KITKAT)
+//        @Override
+//        public void clickButton() throws RemoteException {
+//            try {
+//                Field playPauseButton = audioWidget.getClass().getDeclaredField("playPauseButton");
+//                playPauseButton.setAccessible(true);
+//                Class<?> aClass = Class.forName("com.cleveroad.audiowidget.PlayPauseButton");
+//                Method method = aClass.getDeclaredMethod("onClick");
+//                method.invoke(playPauseButton.get(audioWidget));
+//                playPauseButton.setAccessible(false);
+//            } catch (NoSuchFieldException | ClassNotFoundException | NoSuchMethodException e) {
+//                e.printStackTrace();
+//            } catch (IllegalAccessException e) {
+//                e.printStackTrace();
+//            } catch (InvocationTargetException e) {
+//                e.printStackTrace();
+//            }
+//        }
     };
 
     @Override

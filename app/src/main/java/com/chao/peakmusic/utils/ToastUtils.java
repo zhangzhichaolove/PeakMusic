@@ -1,7 +1,8 @@
 package com.chao.peakmusic.utils;
 
-import androidx.annotation.StringRes;
 import android.widget.Toast;
+
+import androidx.annotation.StringRes;
 
 /**
  * 封装自定义方法

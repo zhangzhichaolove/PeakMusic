@@ -3,10 +3,11 @@ package com.chao.peakmusic.base;
 import android.content.Context;
 import android.os.Build;
 import android.os.Bundle;
-import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatActivity;
 import android.view.View;
 import android.view.ViewGroup;
+
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
 
 import com.chao.peakmusic.R;
 import com.chao.peakmusic.utils.BarUtils;

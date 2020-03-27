@@ -11,6 +11,7 @@ import android.os.RemoteException;
 
 import androidx.annotation.Nullable;
 
+import com.chao.peakmusic.ActivityCall;
 import com.chao.peakmusic.MusicAidlInterface;
 import com.chao.peakmusic.listener.ControlsClickListener;
 import com.chao.peakmusic.model.SongModel;
@@ -20,9 +21,7 @@ import com.cleveroad.audiowidget.AudioWidget;
 
 import java.io.File;
 import java.io.IOException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -253,6 +252,21 @@ public class MusicServiceSave extends Service {
         public void hide() throws RemoteException {
 
         }
+
+        @Override
+        public void registerCallback(ActivityCall call) throws RemoteException {
+            call.call(isPlay());
+        }
+
+        @Override
+        public void clickButton(boolean isPlay) throws RemoteException {
+            if (isPlay) {
+                audioWidget.controller().start();
+            } else {
+                audioWidget.controller().pause();
+            }
+        }
+
 
     };
 

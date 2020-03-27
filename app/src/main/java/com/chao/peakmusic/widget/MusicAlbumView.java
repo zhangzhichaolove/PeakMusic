@@ -10,9 +10,10 @@ import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.BitmapDrawable;
-import androidx.annotation.Nullable;
 import android.util.AttributeSet;
 import android.view.WindowManager;
+
+import androidx.annotation.Nullable;
 
 import com.chao.peakmusic.utils.FormatDrawable;
 

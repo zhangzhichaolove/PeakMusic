@@ -1,6 +1,7 @@
 package com.chao.peakmusic.fragment;
 
 import android.os.Bundle;
+
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 

@@ -1,6 +1,6 @@
 // TestAidlInterface.aidl
 package com.chao.peakmusic;
-
+import com.chao.peakmusic.ActivityCall;
 // Declare any non-default types here with import statements
 
 interface MusicAidlInterface {
@@ -79,5 +79,9 @@ interface MusicAidlInterface {
       * 隐藏悬浮控件
       */
       void hide();
+
+      void registerCallback(ActivityCall call);
+
+      void clickButton(boolean isPlay);
 
 }

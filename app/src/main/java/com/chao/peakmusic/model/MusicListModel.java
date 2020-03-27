@@ -27,7 +27,7 @@ public class MusicListModel {
         this.songlist = songlist;
     }
 
-    public class SongList{
+    public class SongList {
         private int songid;
         private String title;
         private String artist;

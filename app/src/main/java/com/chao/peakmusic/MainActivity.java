@@ -11,21 +11,8 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.RemoteException;
-
-import androidx.annotation.NonNull;
-import androidx.annotation.RequiresApi;
-
-import com.google.android.material.navigation.NavigationView;
-import com.google.android.material.tabs.TabLayout;
-
-import androidx.fragment.app.Fragment;
-import androidx.core.view.GravityCompat;
-import androidx.viewpager.widget.ViewPager;
-import androidx.drawerlayout.widget.DrawerLayout;
-import androidx.appcompat.app.ActionBarDrawerToggle;
-import androidx.appcompat.widget.Toolbar;
-
 import android.provider.Settings;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.MenuItem;
 import android.view.View;
@@ -33,6 +20,15 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
+import androidx.appcompat.app.ActionBarDrawerToggle;
+import androidx.appcompat.widget.Toolbar;
+import androidx.core.view.GravityCompat;
+import androidx.drawerlayout.widget.DrawerLayout;
+import androidx.fragment.app.Fragment;
+import androidx.viewpager.widget.ViewPager;
 
 import com.chao.peakmusic.activity.MusicPlayActivity;
 import com.chao.peakmusic.adapter.HomePageAdapter;
@@ -47,10 +43,10 @@ import com.chao.peakmusic.utils.AppStatusListener;
 import com.chao.peakmusic.utils.ImageLoaderV4;
 import com.chao.peakmusic.utils.KeyDownUtils;
 import com.chao.peakmusic.utils.ScanningUtils;
+import com.google.android.material.navigation.NavigationView;
+import com.google.android.material.tabs.TabLayout;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -167,29 +163,32 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         iv_play.setOnClickListener(this);
         iv_next.setOnClickListener(this);
 
-        Intent intent = new Intent("com.chao.peakmusic.action.MUSIC_SERVICE");
-        intent.setPackage(getPackageName());
-        startService(intent);
-        bindService(intent, conns, Context.BIND_AUTO_CREATE);
-        //unbindService(connection);
+//        Intent intent = new Intent("com.chao.peakmusic.action.MUSIC_SERVICE");
+//        intent.setPackage(getPackageName());
+//        startService(intent);
+        //测试Service
+//        bindService(intent, conns, Context.BIND_AUTO_CREATE);
+//        unbindService(connection);
 //        AppStatusListener.getInstance().setAppLifecycle(new AppStatusListener.AppLifecycle() {
 //            @Override
 //            public void AppBackstage(boolean isBackstage) {
-//                try {
-//                    if (isBackstage && mService != null) {//App切换到前台隐藏悬浮。
-//                        mService.hide();
-//                    } else if (mService != null) {
-//                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-//                            if (Settings.canDrawOverlays(MainActivity.this)) {//已有悬浮权限
+//                handler.post(() -> {
+//                    try {
+//                        if (isBackstage && mService != null) {//App切换到前台隐藏悬浮。这里会崩溃，原因待查。
+//                            mService.hide();
+//                        } else if (mService != null) {
+//                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+//                                if (Settings.canDrawOverlays(MainActivity.this)) {//已有悬浮权限
+//                                    mService.show();
+//                                }
+//                            } else {//低版本直接显示
 //                                mService.show();
 //                            }
-//                        } else {//低版本直接显示
-//                            mService.show();
 //                        }
+//                    } catch (RemoteException e) {
+//                        e.printStackTrace();
 //                    }
-//                } catch (RemoteException e) {
-//                    e.printStackTrace();
-//                }
+//                });
 //            }
 //        });
     }
@@ -198,23 +197,23 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         return this;
     }
 
-    private TestService audioService;
-
-    //使用ServiceConnection来监听Service状态的变化
-    private ServiceConnection conns = new ServiceConnection() {
-
-        @Override
-        public void onServiceDisconnected(ComponentName name) {
-            audioService = null;
-        }
-
-        @Override
-        public void onServiceConnected(ComponentName name, IBinder binder) {
-            //这里我们实例化audioService,通过binder来实现
-            audioService = ((TestService.AudioBinder) binder).getService();
-            audioService.playMusic();
-        }
-    };
+//    private TestService audioService;
+//
+//    //使用ServiceConnection来监听Service状态的变化
+//    private ServiceConnection conns = new ServiceConnection() {
+//
+//        @Override
+//        public void onServiceDisconnected(ComponentName name) {
+//            audioService = null;
+//        }
+//
+//        @Override
+//        public void onServiceConnected(ComponentName name, IBinder binder) {
+//            //这里我们实例化audioService,通过binder来实现
+//            audioService = ((TestService.AudioBinder) binder).getService();
+//            audioService.playMusic();
+//        }
+//    };
 
     @Override
     public boolean onNavigationItemSelected(@NonNull MenuItem item) {
@@ -245,22 +244,24 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
                 Intent intent = new Intent(mContext, MusicPlayActivity.class);
                 startActivity(intent, ActivityOptions.makeSceneTransitionAnimation(this, iv_album_cover, "album").toBundle());
                 break;
-            case R.id.iv_play:
+            case R.id.iv_play://默认按钮激活状态是false，显示三角图标。
                 if (mService != null) {
-                    if (iv_play.isSelected()) {
+                    if (iv_play.isSelected()) {//当前是暂停图标
                         try {
                             mService.pause();
+                            mService.clickButton(false);
                         } catch (RemoteException e) {
                             e.printStackTrace();
                         }
-                    } else {
+                    } else {//当前是三角图标，点击播放
                         try {
                             mService.play();
+                            mService.clickButton(true);
                         } catch (RemoteException e) {
                             e.printStackTrace();
                         }
                     }
-                    iv_play.setSelected(!iv_play.isSelected());
+                    //iv_play.setSelected(!iv_play.isSelected());
                 }
                 break;
             case R.id.iv_next:
@@ -322,10 +323,20 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
             //这里我们实例化audioService,通过binder来实现
             mService = MusicAidlInterface.Stub.asInterface(binder);
             try {
+                //注册回调，服务状态同步到UI按钮。
+                mService.registerCallback(mCallback);
                 mService.show();
             } catch (RemoteException e) {
                 e.printStackTrace();
             }
+        }
+    };
+
+    private ActivityCall.Stub mCallback = new ActivityCall.Stub() {
+        @Override
+        public void call(boolean isPlay) throws RemoteException {
+            Log.e("TAG", "ActivityCall" + isPlay);
+            runOnUiThread(() -> iv_play.setSelected(isPlay));
         }
     };
 
