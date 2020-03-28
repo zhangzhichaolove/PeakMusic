@@ -12,12 +12,15 @@ import android.os.RemoteException;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
 
 import com.chao.peakmusic.ActivityCall;
 import com.chao.peakmusic.MusicAidlInterface;
 import com.chao.peakmusic.listener.ControlsClickListener;
+import com.chao.peakmusic.model.MusicModel;
 import com.chao.peakmusic.model.SongModel;
 import com.chao.peakmusic.utils.LogUtils;
+import com.chao.peakmusic.utils.MusicDataUtils;
 import com.chao.peakmusic.utils.SPUtils;
 import com.chao.peakmusic.utils.ScreenUtils;
 import com.chao.peakmusic.utils.ToastUtils;
@@ -27,6 +30,7 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -50,6 +54,8 @@ public class MusicService extends Service implements AudioWidget.OnWidgetStateCh
     private ControlsClickListener controlsClickListener;
     private ArrayList<SongModel> music;
     private SongModel currentMusic;
+    private List<MusicModel> musicList;
+    private boolean isLocal;
     private int currentPosition = -1;
     private boolean isPlaying = false;
 
@@ -113,7 +119,7 @@ public class MusicService extends Service implements AudioWidget.OnWidgetStateCh
      * @param currentPath 音乐文件路径
      */
     private void playMusic(String currentPath) {
-        currentPath = "http://data.apiopen.top/%E8%A2%81%E7%BB%B4%E5%A8%85-%E8%AF%B4%E6%95%A3%E5%B0%B1%E6%95%A3.mp3";
+        //currentPath = "http://data.apiopen.top/%E8%A2%81%E7%BB%B4%E5%A8%85-%E8%AF%B4%E6%95%A3%E5%B0%B1%E6%95%A3.mp3";
         try {
             if (mediaPlayer == null) {
                 mediaPlayer = new MediaPlayer();
@@ -197,6 +203,7 @@ public class MusicService extends Service implements AudioWidget.OnWidgetStateCh
 
         @Override
         public void openAudio(int position) throws RemoteException {
+            isLocal = true;
             currentMusic = music.get(position);
             currentPosition = position;
             playMusic(music.get(position).getPath()/*"/storage/emulated/0/Download/What are words.mp3"*/);
@@ -204,7 +211,16 @@ public class MusicService extends Service implements AudioWidget.OnWidgetStateCh
 
         @Override
         public void playAudio(String url) throws RemoteException {
-            currentPosition = -1;
+            isLocal = false;
+            musicList = MusicDataUtils.getInstance().getMusicList();
+            if (musicList != null) {
+                for (int i = 0; i < musicList.size(); i++) {
+                    if (musicList.get(i).getMp3().equals(url)) {
+                        currentPosition = i;
+                        break;
+                    }
+                }
+            }
             playMusic(url);
         }
 
@@ -214,7 +230,10 @@ public class MusicService extends Service implements AudioWidget.OnWidgetStateCh
                 mediaPlayer.start();
                 isPlaying = true;
             } else if (mediaPlayer == null) {
-                openAudio(0);
+               // openAudio(0);
+                if (activityCall != null) {
+                    activityCall.defaultPlay();//直接点击播放按钮，触发默认歌曲。
+                }
             }
             //悬浮按钮点击播放触发此方法，同步状态到外部UI。
             if (activityCall != null) {
@@ -295,30 +314,64 @@ public class MusicService extends Service implements AudioWidget.OnWidgetStateCh
 
         @Override
         public void pre() throws RemoteException {
-            if (music != null && music.size() > 0) {
-                currentPosition--;
-                if (currentPosition >= 0) {
-                    openAudio(currentPosition);
-                } else {
-                    openAudio(music.size() - 1);
-                }
-            } else {
-                ToastUtils.showToast("没有更多歌曲了~");
+            if (activityCall != null) {
+                activityCall.pre();
             }
+//            if (isLocal) {//本地音乐
+//                if (music != null && music.size() > 0) {
+//                    currentPosition--;
+//                    if (currentPosition >= 0) {
+//                        openAudio(currentPosition);
+//                    } else {
+//                        openAudio(music.size() - 1);
+//                    }
+//                } else {
+//                    ToastUtils.showToast("没有更多歌曲了~");
+//                }
+//            } else {//线上音乐
+//                musicList = MusicDataUtils.getInstance().getMusicList();
+//                if (musicList != null && musicList.size() > 0) {
+//                    currentPosition--;
+//                    if (currentPosition >= 0) {
+//                        playAudio(musicList.get(currentPosition).getMp3());
+//                    } else {
+//                        playAudio(musicList.get(musicList.size() - 1).getMp3());
+//                    }
+//                } else {
+//                    ToastUtils.showToast("没有更多歌曲了~");
+//                }
+//            }
         }
 
         @Override
         public void next() throws RemoteException {
-            if (music != null && music.size() > 0) {
-                currentPosition++;
-                if (currentPosition <= music.size() - 1) {
-                    openAudio(currentPosition);
-                } else {
-                    openAudio(0);
-                }
-            } else {
-                ToastUtils.showToast("没有更多歌曲了~");
+            if (activityCall != null) {
+                activityCall.next();
             }
+//            if (isLocal) {
+//                if (music != null && music.size() > 0) {
+//                    currentPosition++;
+//                    if (currentPosition <= music.size() - 1) {
+//                        openAudio(currentPosition);
+//                    } else {
+//                        openAudio(0);
+//                    }
+//                } else {
+//                    ToastUtils.showToast("没有更多歌曲了~");
+//                }
+//            } else {
+//                musicList = MusicDataUtils.getInstance().getMusicList();
+//                if (musicList != null && musicList.size() > 0) {
+//                    currentPosition++;
+//                    if (currentPosition <= musicList.size() - 1) {
+//                        playAudio(musicList.get(currentPosition).getMp3());
+//                    } else {
+//                        playAudio(musicList.get(0).getMp3());
+//                    }
+//                } else {
+//                    ToastUtils.showToast("没有更多歌曲了~");
+//                }
+//            }
         }
 
         @Override

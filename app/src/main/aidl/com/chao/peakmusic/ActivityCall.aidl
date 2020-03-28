@@ -6,4 +6,10 @@ package com.chao.peakmusic;
 interface ActivityCall {
 
     void call(boolean isPlay);
+
+    void pre();
+
+    void next();
+
+    void defaultPlay();
 }

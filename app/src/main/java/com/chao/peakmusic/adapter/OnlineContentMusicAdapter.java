@@ -9,7 +9,7 @@ import android.widget.TextView;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.chao.peakmusic.R;
-import com.chao.peakmusic.model.MusicListModel;
+import com.chao.peakmusic.model.MusicModel;
 import com.chao.peakmusic.utils.ImageLoaderV4;
 
 import java.util.List;
@@ -21,7 +21,7 @@ import java.util.List;
 public class OnlineContentMusicAdapter extends RecyclerView.Adapter<OnlineContentMusicAdapter.Holder> {
 
     private onItemClick itemClick;
-    private List<MusicListModel.SongList> data;
+    private List<MusicModel> data;
 
     @Override
     public OnlineContentMusicAdapter.Holder onCreateViewHolder(ViewGroup parent, int viewType) {
@@ -31,8 +31,8 @@ public class OnlineContentMusicAdapter extends RecyclerView.Adapter<OnlineConten
 
     @Override
     public void onBindViewHolder(OnlineContentMusicAdapter.Holder holder, final int position) {
-        holder.tv_title.setText(data.get(position).getTitle());
-        holder.tv_artist.setText(data.get(position).getArtist());
+        holder.tv_title.setText(data.get(position).getName());
+        holder.tv_artist.setText(data.get(position).getSinger());
         holder.itemView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -41,7 +41,7 @@ public class OnlineContentMusicAdapter extends RecyclerView.Adapter<OnlineConten
                 }
             }
         });
-        ImageLoaderV4.getInstance().load(holder.itemView.getContext(), holder.iv_cover, data.get(position).getThumb());
+        ImageLoaderV4.getInstance().load(holder.itemView.getContext(), holder.iv_cover, data.get(position).getImg());
     }
 
     @Override
@@ -49,12 +49,12 @@ public class OnlineContentMusicAdapter extends RecyclerView.Adapter<OnlineConten
         return data == null ? 0 : data.size();
     }
 
-    public void setData(List<MusicListModel.SongList> data) {
+    public void setData(List<MusicModel> data) {
         this.data = data;
         notifyDataSetChanged();
     }
 
-    public List<MusicListModel.SongList> getData() {
+    public List<MusicModel> getData() {
         return this.data;
     }
 

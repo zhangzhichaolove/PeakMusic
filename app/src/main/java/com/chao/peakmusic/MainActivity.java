@@ -36,17 +36,21 @@ import com.chao.peakmusic.base.BaseActivity;
 import com.chao.peakmusic.fragment.LocalMusicFragment;
 import com.chao.peakmusic.fragment.OnLineMusicFragment;
 import com.chao.peakmusic.listener.PlayMusicListener;
+import com.chao.peakmusic.model.MusicModel;
 import com.chao.peakmusic.model.SongModel;
 import com.chao.peakmusic.service.MusicService;
 import com.chao.peakmusic.service.TestService;
 import com.chao.peakmusic.utils.AppStatusListener;
 import com.chao.peakmusic.utils.ImageLoaderV4;
 import com.chao.peakmusic.utils.KeyDownUtils;
+import com.chao.peakmusic.utils.MusicDataUtils;
 import com.chao.peakmusic.utils.ScanningUtils;
+import com.chao.peakmusic.utils.ToastUtils;
 import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.tabs.TabLayout;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -338,6 +342,56 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
             Log.e("TAG", "ActivityCall" + isPlay);
             runOnUiThread(() -> iv_play.setSelected(isPlay));
         }
+
+        @Override
+        public void pre() throws RemoteException {
+            runOnUiThread(() -> {
+                int currentPosition = MusicDataUtils.getInstance().getCurrentPosition();
+                if (currentPosition <= 0) {
+                    ToastUtils.showToast("没有更多歌曲了~");
+                } else {
+                    List<MusicModel> musicList = MusicDataUtils.getInstance().getMusicList();
+                    currentPosition -= 1;
+                    MusicDataUtils.getInstance().setCurrentPosition(currentPosition);
+                    MusicModel musicModel = musicList.get(currentPosition);
+                    playMusic(musicModel.getMp3(),
+                            musicModel.getName(), musicModel.getSinger(),
+                            musicModel.getImg());
+                }
+            });
+        }
+
+        @Override
+        public void next() throws RemoteException {
+            runOnUiThread(() -> {
+                List<MusicModel> musicList = MusicDataUtils.getInstance().getMusicList();
+                int currentPosition = MusicDataUtils.getInstance().getCurrentPosition();
+                if (currentPosition >= musicList.size() - 1) {
+                    ToastUtils.showToast("没有更多歌曲了~");
+                } else {
+                    currentPosition += 1;
+                    MusicDataUtils.getInstance().setCurrentPosition(currentPosition);
+                    MusicModel musicModel = musicList.get(currentPosition);
+                    playMusic(musicModel.getMp3(),
+                            musicModel.getName(), musicModel.getSinger(),
+                            musicModel.getImg());
+                }
+            });
+        }
+
+        @Override
+        public void defaultPlay() throws RemoteException {
+            List<MusicModel> musicList = MusicDataUtils.getInstance().getMusicList();
+            if (musicList != null && musicList.size() > 0) {
+                MusicDataUtils.getInstance().setCurrentPosition(0);
+                MusicModel musicModel = musicList.get(0);
+                playMusic(musicModel.getMp3(),
+                        musicModel.getName(), musicModel.getSinger(),
+                        musicModel.getImg());
+            } else {
+                ToastUtils.showToast("你的曲库没有歌曲呢~");
+            }
+        }
     };
 
     @Override
@@ -375,6 +429,7 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         try {
             if (mService != null) {
                 mService.openAudio(position);
+                mService.clickButton(true);
             }
         } catch (RemoteException e) {
             e.printStackTrace();
@@ -390,6 +445,7 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         try {
             if (mService != null) {
                 mService.playAudio(url);
+                mService.clickButton(true);
             }
         } catch (RemoteException e) {
             e.printStackTrace();

@@ -5,24 +5,24 @@ package com.chao.peakmusic.base;
  * description
  */
 public class HttpResult<T> {
-    private int code;
-    private String message;
+    private boolean success;
+    private String msg;
     private T result;
 
-    public int getCode() {
-        return code;
+    public boolean isSuccess() {
+        return success;
     }
 
-    public void setCode(int code) {
-        this.code = code;
+    public void setSuccess(boolean success) {
+        this.success = success;
     }
 
-    public String getMessage() {
-        return message;
+    public String getMsg() {
+        return msg;
     }
 
-    public void setMessage(String message) {
-        this.message = message;
+    public void setMsg(String msg) {
+        this.msg = msg;
     }
 
     public T getResult() {

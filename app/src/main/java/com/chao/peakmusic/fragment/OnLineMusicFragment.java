@@ -16,8 +16,12 @@ import com.chao.peakmusic.base.HttpResult;
 import com.chao.peakmusic.base.ServiceFactory;
 import com.chao.peakmusic.model.MusicDetailsResultModel;
 import com.chao.peakmusic.model.MusicListModel;
+import com.chao.peakmusic.model.MusicModel;
 import com.chao.peakmusic.utils.LogUtils;
+import com.chao.peakmusic.utils.MusicDataUtils;
 import com.chao.peakmusic.utils.ToastUtils;
+
+import java.util.List;
 
 import butterknife.BindView;
 import io.reactivex.Observer;
@@ -58,14 +62,19 @@ public class OnLineMusicFragment extends BaseFragment {
         contentMusicAdapter.setListener(new OnlineContentMusicAdapter.onItemClick() {
             @Override
             public void itemClickListener(int position) {
-                playMusicWithId(contentMusicAdapter.getData().get(position).getSongid());
+                //playMusicWithId(contentMusicAdapter.getData().get(position).getSongid());
+                MusicModel musicModel = contentMusicAdapter.getData().get(position);
+                ((MainActivity) getActivity()).getListener().playMusic(musicModel.getMp3(),
+                        musicModel.getName(), musicModel.getSinger(),
+                        musicModel.getImg());
+                MusicDataUtils.getInstance().setCurrentPosition(position);
             }
         });
     }
 
     @Override
     public void initData() {
-        ApiRequest.obtain(ServiceFactory.getInstance().createService(ApiUrl.class).getMusicHome(), new Observer<HttpResult<MusicListModel>>() {
+        ApiRequest.obtain(ServiceFactory.getInstance().createService(ApiUrl.class).getMusicList(""), new Observer<HttpResult<MusicListModel>>() {
             @Override
             public void onSubscribe(Disposable d) {
                 disposables.add(d);
@@ -74,7 +83,8 @@ public class OnLineMusicFragment extends BaseFragment {
             @Override
             public void onNext(HttpResult<MusicListModel> objectHttpResult) {
                 LogUtils.showTagE(objectHttpResult);
-                contentMusicAdapter.setData(objectHttpResult.getResult().getSonglist());
+                contentMusicAdapter.setData(objectHttpResult.getResult().getRecords());
+                MusicDataUtils.getInstance().setMusicList(objectHttpResult.getResult().getRecords());
                 //titleMusicAdapter.setData(objectHttpResult.getResult().getSonglist());
             }
 
@@ -91,30 +101,30 @@ public class OnLineMusicFragment extends BaseFragment {
     }
 
     private void playMusicWithId(int id) {
-        ApiRequest.obtain(ServiceFactory.getInstance().createService(ApiUrl.class).getMusicDetails(id), new Observer<HttpResult<MusicDetailsResultModel>>() {
-            @Override
-            public void onSubscribe(Disposable d) {
-                disposables.add(d);
-            }
-
-            @Override
-            public void onNext(HttpResult<MusicDetailsResultModel> objectHttpResult) {
-                LogUtils.showTagE(objectHttpResult.getResult().getSongList().get(0).getSongLink());
-                ((MainActivity) getActivity()).getListener().playMusic(objectHttpResult.getResult().getSongList().get(0).getSongLink(),
-                        objectHttpResult.getResult().getSongList().get(0).getSongName(), objectHttpResult.getResult().getSongList().get(0).getArtistName(),
-                        objectHttpResult.getResult().getSongList().get(0).getSongPicBig());
-            }
-
-            @Override
-            public void onError(Throwable e) {
-                LogUtils.showTagE(e);
-                ToastUtils.showToast("此歌曲飞走了~");
-            }
-
-            @Override
-            public void onComplete() {
-
-            }
-        });
+//        ApiRequest.obtain(ServiceFactory.getInstance().createService(ApiUrl.class).getMusicDetails(id), new Observer<HttpResult<MusicDetailsResultModel>>() {
+//            @Override
+//            public void onSubscribe(Disposable d) {
+//                disposables.add(d);
+//            }
+//
+//            @Override
+//            public void onNext(HttpResult<MusicDetailsResultModel> objectHttpResult) {
+//                LogUtils.showTagE(objectHttpResult.getResult().getSongList().get(0).getSongLink());
+//                ((MainActivity) getActivity()).getListener().playMusic(objectHttpResult.getResult().getSongList().get(0).getSongLink(),
+//                        objectHttpResult.getResult().getSongList().get(0).getSongName(), objectHttpResult.getResult().getSongList().get(0).getArtistName(),
+//                        objectHttpResult.getResult().getSongList().get(0).getSongPicBig());
+//            }
+//
+//            @Override
+//            public void onError(Throwable e) {
+//                LogUtils.showTagE(e);
+//                ToastUtils.showToast("此歌曲飞走了~");
+//            }
+//
+//            @Override
+//            public void onComplete() {
+//
+//            }
+//        });
     }
 }

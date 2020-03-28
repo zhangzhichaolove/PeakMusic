@@ -7,63 +7,58 @@ import java.util.List;
  */
 
 public class MusicListModel {
+    /**
+     * "total": 16,
+     * "size": 12,
+     * "current": 1,
+     * "orders": [],
+     * "hitCount": false,
+     * "searchCount": true,
+     * "pages": 2
+     */
+    private int current;
+    private int pages;
+    private int size;
+    private int total;
+    private List<MusicModel> records;
 
-    private String channel;
-    private List<SongList> songlist;
-
-    public String getChannel() {
-        return channel;
+    public int getCurrent() {
+        return current;
     }
 
-    public void setChannel(String channel) {
-        this.channel = channel;
+    public void setCurrent(int current) {
+        this.current = current;
     }
 
-    public List<SongList> getSonglist() {
-        return songlist;
+    public int getPages() {
+        return pages;
     }
 
-    public void setSonglist(List<SongList> songlist) {
-        this.songlist = songlist;
+    public void setPages(int pages) {
+        this.pages = pages;
     }
 
-    public class SongList {
-        private int songid;
-        private String title;
-        private String artist;
-        private String thumb;
-
-        public int getSongid() {
-            return songid;
-        }
-
-        public void setSongid(int songid) {
-            this.songid = songid;
-        }
-
-        public String getTitle() {
-            return title;
-        }
-
-        public void setTitle(String title) {
-            this.title = title;
-        }
-
-        public String getArtist() {
-            return artist;
-        }
-
-        public void setArtist(String artist) {
-            this.artist = artist;
-        }
-
-        public String getThumb() {
-            return thumb;
-        }
-
-        public void setThumb(String thumb) {
-            this.thumb = thumb;
-        }
+    public int getSize() {
+        return size;
     }
 
+    public void setSize(int size) {
+        this.size = size;
+    }
+
+    public int getTotal() {
+        return total;
+    }
+
+    public void setTotal(int total) {
+        this.total = total;
+    }
+
+    public List<MusicModel> getRecords() {
+        return records;
+    }
+
+    public void setRecords(List<MusicModel> records) {
+        this.records = records;
+    }
 }
