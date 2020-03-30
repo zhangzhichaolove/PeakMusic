@@ -132,6 +132,14 @@ public class MusicService extends Service implements AudioWidget.OnWidgetStateCh
                 mediaPlayer.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
                     @Override
                     public void onPrepared(MediaPlayer mediaPlayer) {
+                        isPlaying = true;
+                        if (activityCall != null) {
+                            try {
+                                activityCall.call(isPlaying);
+                            } catch (RemoteException e) {
+                                e.printStackTrace();
+                            }
+                        }
                         mediaPlayer.start();
                         //audioWidget.controller().start();
                         audioWidget.controller().duration(mediaPlayer.getDuration());
@@ -230,7 +238,7 @@ public class MusicService extends Service implements AudioWidget.OnWidgetStateCh
                 mediaPlayer.start();
                 isPlaying = true;
             } else if (mediaPlayer == null) {
-               // openAudio(0);
+                // openAudio(0);
                 if (activityCall != null) {
                     activityCall.defaultPlay();//直接点击播放按钮，触发默认歌曲。
                 }

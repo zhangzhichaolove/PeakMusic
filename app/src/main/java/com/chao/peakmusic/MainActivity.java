@@ -381,16 +381,18 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
 
         @Override
         public void defaultPlay() throws RemoteException {
-            List<MusicModel> musicList = MusicDataUtils.getInstance().getMusicList();
-            if (musicList != null && musicList.size() > 0) {
-                MusicDataUtils.getInstance().setCurrentPosition(0);
-                MusicModel musicModel = musicList.get(0);
-                playMusic(musicModel.getMp3(),
-                        musicModel.getName(), musicModel.getSinger(),
-                        musicModel.getImg());
-            } else {
-                ToastUtils.showToast("你的曲库没有歌曲呢~");
-            }
+            runOnUiThread(() -> {
+                List<MusicModel> musicList = MusicDataUtils.getInstance().getMusicList();
+                if (musicList != null && musicList.size() > 0) {
+                    MusicDataUtils.getInstance().setCurrentPosition(0);
+                    MusicModel musicModel = musicList.get(0);
+                    playMusic(musicModel.getMp3(),
+                            musicModel.getName(), musicModel.getSinger(),
+                            musicModel.getImg());
+                } else {
+                    ToastUtils.showToast("你的曲库没有歌曲呢~");
+                }
+            });
         }
     };
 
