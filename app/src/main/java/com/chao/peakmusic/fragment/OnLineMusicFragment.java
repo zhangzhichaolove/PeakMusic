@@ -1,7 +1,9 @@
 package com.chao.peakmusic.fragment;
 
 import android.os.Bundle;
+import android.widget.TextView;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -68,7 +70,26 @@ public class OnLineMusicFragment extends BaseFragment {
                         musicModel.getImg());
                 MusicDataUtils.getInstance().setCurrentPosition(position);
             }
+
+            @Override
+            public void itemLongClickListener(int position) {
+                showMusicDetails(contentMusicAdapter.getData().get(position));
+            }
         });
+    }
+
+    private void showMusicDetails(MusicModel music) {
+        AlertDialog dialog = new AlertDialog.Builder(mContext)
+                .setTitle(R.string.music_details)
+                .setMessage(getString(R.string.online_music_details,
+                        music.getName(), music.getSinger(), music.getImg(), music.getLrc(),
+                        music.getMp3()))
+                .setPositiveButton(android.R.string.ok, null)
+                .show();
+        TextView message = dialog.findViewById(android.R.id.message);
+        if (message != null) {
+            message.setTextIsSelectable(true);
+        }
     }
 
     @Override

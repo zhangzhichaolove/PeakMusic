@@ -1,7 +1,11 @@
 package com.chao.peakmusic.fragment;
 
 import android.os.Bundle;
+import android.text.format.DateUtils;
+import android.text.format.Formatter;
+import android.widget.TextView;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -65,7 +69,28 @@ public class LocalMusicFragment extends BaseFragment {
                     listener.playMusic(position, music.get(position).getSong(), music.get(position).getSinger());
                 }
             }
+
+            @Override
+            public void itemLongClickListener(int position) {
+                showMusicDetails(music.get(position));
+            }
         });
+    }
+
+    private void showMusicDetails(SongModel song) {
+        String duration = DateUtils.formatElapsedTime(Math.max(0, song.getDuration()) / 1000L);
+        String size = Formatter.formatFileSize(mContext, song.getSize());
+        AlertDialog dialog = new AlertDialog.Builder(mContext)
+                .setTitle(R.string.music_details)
+                .setMessage(getString(R.string.local_music_details,
+                        song.getSong(), song.getSinger(), song.getAlbum(), duration, size,
+                        song.getFilePath()))
+                .setPositiveButton(android.R.string.ok, null)
+                .show();
+        TextView message = dialog.findViewById(android.R.id.message);
+        if (message != null) {
+            message.setTextIsSelectable(true);
+        }
     }
 
     public void setMusic(ArrayList<SongModel> music) {

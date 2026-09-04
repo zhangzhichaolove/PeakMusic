@@ -32,6 +32,10 @@ public class SongModel implements Serializable, Parcelable {
      */
     private String path;
     /**
+     * 音乐在本地存储中的文件路径
+     */
+    private String filePath;
+    /**
      * 歌曲长度
      */
     private int duration;
@@ -90,6 +94,14 @@ public class SongModel implements Serializable, Parcelable {
         this.path = path;
     }
 
+    public String getFilePath() {
+        return filePath;
+    }
+
+    public void setFilePath(String filePath) {
+        this.filePath = filePath;
+    }
+
     public int getDuration() {
         return duration;
     }
@@ -118,6 +130,7 @@ public class SongModel implements Serializable, Parcelable {
         dest.writeString(album);
         dest.writeLong(albumId);
         dest.writeString(path);
+        dest.writeString(filePath);
         dest.writeInt(duration);
         dest.writeLong(size);
     }
@@ -140,6 +153,7 @@ public class SongModel implements Serializable, Parcelable {
         album = in.readString();
         albumId = in.readLong();
         path = in.readString();
+        filePath = in.readString();
         duration = in.readInt();
         size = in.readLong();
     }

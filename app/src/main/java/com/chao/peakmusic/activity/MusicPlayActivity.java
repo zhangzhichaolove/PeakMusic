@@ -108,7 +108,9 @@ public class MusicPlayActivity extends BaseActivity {
         trackTitle = name;
         setTitle(trackTitle);
         mToolbar.setTitle(trackTitle);
-        mToolbar.post(() -> mToolbar.setTitle(trackTitle));
+        TextView toolbarTitle = findViewById(R.id.toolbar_tv_title);
+        toolbarTitle.setText(trackTitle);
+        toolbarTitle.post(() -> toolbarTitle.setText(trackTitle));
         musicName.setText(name);
         musicSinger.setText(singer);
         if (!TextUtils.isEmpty(image)) {

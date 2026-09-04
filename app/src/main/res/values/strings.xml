@@ -21,4 +21,7 @@
     <string name="lyrics_empty">暂无歌词</string>
     <string name="unknown_music">暂无正在播放的音乐</string>
     <string name="unknown_singer">未知歌手</string>
+    <string name="music_details">音乐详情</string>
+    <string name="online_music_details">名称：%1$s\n歌手：%2$s\n封面地址：%3$s\n歌词地址：%4$s\n音乐地址：%5$s</string>
+    <string name="local_music_details">歌曲名：%1$s\n歌手：%2$s\n专辑：%3$s\n时长：%4$s\n大小：%5$s\n音乐地址：%6$s</string>
 </resources>

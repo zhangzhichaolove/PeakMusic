@@ -41,6 +41,13 @@ public class LocalMusicAdapter extends RecyclerView.Adapter<LocalMusicAdapter.Ho
                 }
             }
         });
+        holder.itemView.setOnLongClickListener(view -> {
+            int adapterPosition = holder.getBindingAdapterPosition();
+            if (itemClick != null && adapterPosition != RecyclerView.NO_POSITION) {
+                itemClick.itemLongClickListener(adapterPosition);
+            }
+            return true;
+        });
         //ImageLoaderV4.getInstance().load(holder.itemView.getContext(), holder.iv_cover, Uri.parse("content://media/external/audio/media/" + data.get(position).getAlbumId() + "/albumart"));
     }
 
@@ -73,6 +80,8 @@ public class LocalMusicAdapter extends RecyclerView.Adapter<LocalMusicAdapter.Ho
 
     public interface onItemClick {
         void itemClickListener(int position);
+
+        void itemLongClickListener(int position);
     }
 
 

@@ -65,6 +65,7 @@ public class ScanningUtils {
         String ORDER_BY = MediaStore.Audio.Media.DATE_ADDED + " DESC";
         String[] PROJECTIONS = {
                 MediaStore.Audio.Media._ID,
+                MediaStore.Audio.Media.DATA,
                 MediaStore.Audio.Media.TITLE,
                 MediaStore.Audio.Media.DISPLAY_NAME,
                 MediaStore.Audio.Media.MIME_TYPE,
@@ -87,6 +88,8 @@ public class ScanningUtils {
 
                 long id = c.getLong(c.getColumnIndexOrThrow(MediaStore.Audio.Media._ID));
                 String path = ContentUris.withAppendedId(MEDIA_URI, id).toString();
+                String filePath = c.getString(
+                        c.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA));
 
 //                String name = c.getString(c.getColumnIndexOrThrow(MediaStore.Audio.Media.DISPLAY_NAME)); // 歌曲名
 //                String title = c.getString(c.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)); // 歌曲名
@@ -109,6 +112,7 @@ public class ScanningUtils {
                 // int albumId = c.getInt(c.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID));
                 //if (duration > 10 * 1000 && name.endsWith(".mp3")) {
                 SongModel music = new SongModel(artist, name, album, albumId, path, duration, size);
+                music.setFilePath(filePath);
                 musics.add(music);
                 //}
             }

@@ -43,6 +43,13 @@ public class OnlineContentMusicAdapter extends RecyclerView.Adapter<OnlineConten
                 }
             }
         });
+        holder.itemView.setOnLongClickListener(view -> {
+            int adapterPosition = holder.getBindingAdapterPosition();
+            if (itemClick != null && adapterPosition != RecyclerView.NO_POSITION) {
+                itemClick.itemLongClickListener(adapterPosition);
+            }
+            return true;
+        });
     }
 
     @Override
@@ -78,6 +85,8 @@ public class OnlineContentMusicAdapter extends RecyclerView.Adapter<OnlineConten
 
     public interface onItemClick {
         void itemClickListener(int position);
+
+        void itemLongClickListener(int position);
     }
 
 
