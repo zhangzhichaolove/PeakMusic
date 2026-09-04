@@ -14,6 +14,9 @@ interface MusicAidlInterface {
       */
       void playAudio(String url, String name, String artist);
 
+      void setOnlineQueue(in List<String> urls, in List<String> names,
+                          in List<String> artists, int currentIndex);
+
      /**
       * 播放
       */
@@ -59,6 +62,8 @@ interface MusicAidlInterface {
       * 设置播放模式
       */
       void seekPlayMode(int mode);
+
+      int getPlayMode();
 
      /**
       * 上一首

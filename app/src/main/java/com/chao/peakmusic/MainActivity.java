@@ -47,6 +47,7 @@ import com.chao.peakmusic.listener.PlayMusicListener;
 import com.chao.peakmusic.model.MusicModel;
 import com.chao.peakmusic.model.SongModel;
 import com.chao.peakmusic.service.MusicService;
+import com.chao.peakmusic.service.PlaybackModeNavigator;
 import com.chao.peakmusic.utils.ImageLoaderV4;
 import com.chao.peakmusic.utils.KeyDownUtils;
 import com.chao.peakmusic.utils.MusicDataUtils;
@@ -218,7 +219,38 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
             startActivity(new Intent(this, ApiLogActivity.class));
             return true;
         }
+        if (item.getItemId() == R.id.action_play_mode) {
+            showPlayModeDialog();
+            return true;
+        }
         return false;
+    }
+
+    private void showPlayModeDialog() {
+        if (mService == null) {
+            ToastUtils.showToast(getString(R.string.playback_service_unavailable));
+            return;
+        }
+        String[] modes = getResources().getStringArray(R.array.play_modes);
+        int currentMode = PlaybackModeNavigator.SEQUENTIAL;
+        try {
+            currentMode = mService.getPlayMode();
+        } catch (RemoteException error) {
+            Log.e("MainActivity", "Unable to read play mode", error);
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.play_mode)
+                .setSingleChoiceItems(modes, currentMode, (dialog, which) -> {
+                    try {
+                        mService.seekPlayMode(which);
+                        ToastUtils.showToast(getString(R.string.play_mode_changed, modes[which]));
+                    } catch (RemoteException error) {
+                        Log.e("MainActivity", "Unable to set play mode", error);
+                    }
+                    dialog.dismiss();
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
     }
 
     private void showApiAddressDialog() {
@@ -399,13 +431,19 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         }
 
         @Override
-        public void trackChanged(String name, String artist, boolean local) {
+        public void trackChanged(String source, String name, String artist, boolean local) {
             runOnUiThread(() -> {
                 if (local) {
                     currentOnlineMusic = null;
                     currentTrackImage = null;
                     ImageLoaderV4.getInstance().loadCircle(mContext, iv_album_cover,
                             R.drawable.default_cover);
+                } else {
+                    currentOnlineMusic = findOnlineMusic(source);
+                    currentTrackImage = currentOnlineMusic == null ? null
+                            : currentOnlineMusic.getImg();
+                    ImageLoaderV4.getInstance().loadCircle(mContext, iv_album_cover,
+                            currentTrackImage == null ? R.drawable.default_cover : currentTrackImage);
                 }
                 currentTrackName = name;
                 currentTrackArtist = artist;
@@ -483,6 +521,19 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         ImageLoaderV4.getInstance().loadCircle(mContext, iv_album_cover, img);
         try {
             if (mService != null) {
+                List<MusicModel> queue = MusicDataUtils.getInstance().getMusicList();
+                if (queue != null && !queue.isEmpty()) {
+                    ArrayList<String> urls = new ArrayList<>();
+                    ArrayList<String> names = new ArrayList<>();
+                    ArrayList<String> artists = new ArrayList<>();
+                    for (MusicModel item : queue) {
+                        urls.add(item.getMp3());
+                        names.add(item.getName());
+                        artists.add(item.getSinger());
+                    }
+                    mService.setOnlineQueue(urls, names, artists,
+                            MusicDataUtils.getInstance().getCurrentPosition());
+                }
                 mService.playAudio(url, name, artist);
             }
         } catch (RemoteException e) {

@@ -51,4 +51,13 @@
     <string name="api_log_clear">清空</string>
     <string name="api_log_read_failed">读取失败：%1$s</string>
     <string name="copied">已复制</string>
+    <string name="play_mode">播放模式</string>
+    <string name="play_mode_changed">已切换为%1$s</string>
+    <string name="playback_service_unavailable">播放服务尚未就绪</string>
+    <string-array name="play_modes">
+        <item>顺序播放</item>
+        <item>列表循环</item>
+        <item>单曲循环</item>
+        <item>随机播放</item>
+    </string-array>
 </resources>
