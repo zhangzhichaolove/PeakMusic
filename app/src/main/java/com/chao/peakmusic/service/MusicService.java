@@ -312,7 +312,7 @@ public class MusicService extends Service implements AudioWidget.OnWidgetStateCh
 
         @Override
         public int getCurrentPosition() throws RemoteException {
-            return mediaPlayer == null || !mediaPlayer.isPlaying() ? 0 : mediaPlayer.getCurrentPosition();
+            return mediaPlayer == null ? 0 : mediaPlayer.getCurrentPosition();
         }
 
         @Override

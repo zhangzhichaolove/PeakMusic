@@ -69,45 +69,19 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/tv_music_name" />
 
-    <TextView
-        android:id="@+id/tv_lyrics_title"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="20dp"
-        android:layout_marginTop="18dp"
-        android:text="@string/lyrics"
-        android:textColor="@color/text_main_color"
-        android:textSize="16sp"
-        android:textStyle="bold"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tv_music_singer" />
-
-    <ScrollView
-        android:id="@+id/lyrics_scroll"
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/lyrics_list"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:layout_marginStart="20dp"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="18dp"
         android:layout_marginEnd="20dp"
         android:layout_marginBottom="16dp"
-        android:fillViewport="true"
+        android:clipToPadding="false"
         android:overScrollMode="ifContentScrolls"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tv_lyrics_title">
-
-        <TextView
-            android:id="@+id/tv_lyrics"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center_horizontal"
-            android:lineSpacingExtra="8dp"
-            android:paddingBottom="20dp"
-            android:text="@string/lyrics_loading"
-            android:textColor="@color/normalColor"
-            android:textIsSelectable="true"
-            android:textSize="16sp" />
-    </ScrollView>
+        app:layout_constraintTop_toBottomOf="@id/tv_music_singer" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
