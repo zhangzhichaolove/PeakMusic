@@ -611,7 +611,7 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
     private void startPlaybackService(ArrayList<SongModel> songs) {
         Intent intent = new Intent(mContext, MusicService.class);
         if (songs != null) {
-            intent.putExtra(MusicService.EXTRAS_MUSIC, songs);
+            intent.putParcelableArrayListExtra(MusicService.EXTRAS_MUSIC, songs);
         }
         ContextCompat.startForegroundService(mContext, intent);
         if (!serviceBound) {

@@ -7,10 +7,11 @@ import androidx.room.PrimaryKey;
 import com.chao.peakmusic.model.MusicModel;
 import com.chao.peakmusic.model.SongModel;
 
-import java.io.Serializable;
+import android.os.Parcel;
+import android.os.Parcelable;
 
 @Entity(tableName = "music_tracks")
-public class MusicTrackEntity implements Serializable {
+public class MusicTrackEntity implements Parcelable {
     @PrimaryKey
     @NonNull
     public String source = "";
@@ -73,4 +74,61 @@ public class MusicTrackEntity implements Serializable {
     private static String safe(String value) {
         return value == null ? "" : value;
     }
+
+    public MusicTrackEntity() {
+    }
+
+    private MusicTrackEntity(Parcel in) {
+        source = in.readString();
+        name = in.readString();
+        artist = in.readString();
+        imageUrl = in.readString();
+        lyricsUrl = in.readString();
+        local = in.readByte() != 0;
+        album = in.readString();
+        filePath = in.readString();
+        albumId = in.readLong();
+        durationMs = in.readInt();
+        sizeBytes = in.readLong();
+        favorite = in.readByte() != 0;
+        favoriteAt = in.readLong();
+        lastPlayedAt = in.readLong();
+        playCount = in.readInt();
+    }
+
+    @Override
+    public void writeToParcel(Parcel dest, int flags) {
+        dest.writeString(source);
+        dest.writeString(name);
+        dest.writeString(artist);
+        dest.writeString(imageUrl);
+        dest.writeString(lyricsUrl);
+        dest.writeByte((byte) (local ? 1 : 0));
+        dest.writeString(album);
+        dest.writeString(filePath);
+        dest.writeLong(albumId);
+        dest.writeInt(durationMs);
+        dest.writeLong(sizeBytes);
+        dest.writeByte((byte) (favorite ? 1 : 0));
+        dest.writeLong(favoriteAt);
+        dest.writeLong(lastPlayedAt);
+        dest.writeInt(playCount);
+    }
+
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    public static final Creator<MusicTrackEntity> CREATOR = new Creator<MusicTrackEntity>() {
+        @Override
+        public MusicTrackEntity createFromParcel(Parcel in) {
+            return new MusicTrackEntity(in);
+        }
+
+        @Override
+        public MusicTrackEntity[] newArray(int size) {
+            return new MusicTrackEntity[size];
+        }
+    };
 }

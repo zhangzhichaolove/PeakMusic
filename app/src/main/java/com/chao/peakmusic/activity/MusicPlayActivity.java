@@ -76,6 +76,7 @@ public class MusicPlayActivity extends BaseActivity {
     private String currentSource;
     private long lyricOffsetMs;
     private TextView lyricOffsetLabel;
+    private final OkHttpClient lyricsClient = new OkHttpClient();
     private boolean hasTimedLyrics;
     private boolean userSeeking;
     private boolean followCurrentLyric = true;
@@ -158,7 +159,13 @@ public class MusicPlayActivity extends BaseActivity {
             lyricsList.setPadding(0, verticalPadding, 0, verticalPadding);
         });
 
-        MusicModel music = (MusicModel) getIntent().getSerializableExtra(EXTRA_MUSIC);
+        MusicModel music;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            music = getIntent().getParcelableExtra(EXTRA_MUSIC, MusicModel.class);
+        } else {
+            //noinspection deprecation
+            music = getIntent().getParcelableExtra(EXTRA_MUSIC);
+        }
         String name = music == null ? getIntent().getStringExtra(EXTRA_NAME) : music.getName();
         String singer = music == null ? getIntent().getStringExtra(EXTRA_SINGER) : music.getSinger();
         String image = music == null ? getIntent().getStringExtra(EXTRA_IMAGE) : music.getImg();
@@ -221,7 +228,7 @@ public class MusicPlayActivity extends BaseActivity {
     private void loadLyrics(String url) {
         showLyricsMessage(getString(R.string.lyrics_loading));
         Request request = new Request.Builder().url(url).build();
-        lyricsCall = new OkHttpClient().newCall(request);
+        lyricsCall = lyricsClient.newCall(request);
         lyricsCall.enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException error) {
@@ -232,8 +239,11 @@ public class MusicPlayActivity extends BaseActivity {
 
             @Override
             public void onResponse(Call call, Response response) throws IOException {
-                String text = response.isSuccessful() && response.body() != null
-                        ? LyricsParser.decode(response.body().bytes()) : "";
+                String text;
+                try (Response closeableResponse = response) {
+                    text = closeableResponse.isSuccessful() && closeableResponse.body() != null
+                            ? LyricsParser.decode(closeableResponse.body().bytes()) : "";
+                }
                 List<LyricLine> parsedLyrics = LyricsParser.parse(text);
                 runOnUiThread(() -> {
                     if (parsedLyrics.isEmpty()) {

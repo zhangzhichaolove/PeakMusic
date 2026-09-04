@@ -2,7 +2,8 @@ package com.chao.peakmusic.model;
 
 import com.chao.peakmusic.base.ApiAddressManager;
 
-import java.io.Serializable;
+import android.os.Parcel;
+import android.os.Parcelable;
 
 import okhttp3.HttpUrl;
 
@@ -10,7 +11,7 @@ import okhttp3.HttpUrl;
  * Created by Chao on 2018-09-23.
  */
 
-public class MusicModel implements Serializable {
+public class MusicModel implements Parcelable {
 
     /**
      * {
@@ -83,4 +84,43 @@ public class MusicModel implements Serializable {
         HttpUrl resolvedUrl = baseUrl == null || value == null ? null : baseUrl.resolve(value);
         return resolvedUrl == null ? value : resolvedUrl.toString();
     }
+
+    public MusicModel() {
+    }
+
+    private MusicModel(Parcel in) {
+        id = in.readInt();
+        name = in.readString();
+        singer = in.readString();
+        img = in.readString();
+        lrc = in.readString();
+        mp3 = in.readString();
+    }
+
+    @Override
+    public void writeToParcel(Parcel dest, int flags) {
+        dest.writeInt(id);
+        dest.writeString(name);
+        dest.writeString(singer);
+        dest.writeString(img);
+        dest.writeString(lrc);
+        dest.writeString(mp3);
+    }
+
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    public static final Creator<MusicModel> CREATOR = new Creator<MusicModel>() {
+        @Override
+        public MusicModel createFromParcel(Parcel in) {
+            return new MusicModel(in);
+        }
+
+        @Override
+        public MusicModel[] newArray(int size) {
+            return new MusicModel[size];
+        }
+    };
 }

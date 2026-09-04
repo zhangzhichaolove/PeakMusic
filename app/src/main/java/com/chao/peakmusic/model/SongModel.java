@@ -3,13 +3,12 @@ package com.chao.peakmusic.model;
 import android.os.Parcel;
 import android.os.Parcelable;
 
-import java.io.Serializable;
 
 /**
  * Created by Chao on 2017-12-19.
  */
 
-public class SongModel implements Serializable, Parcelable {
+public class SongModel implements Parcelable {
 
     /**
      * 歌手

@@ -46,9 +46,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 /**
  * Music playback service with audio focus, MediaSession and foreground controls.
@@ -164,10 +161,15 @@ public class MusicService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null) {
-            Object extra = intent.getSerializableExtra(EXTRAS_MUSIC);
-            if (extra instanceof ArrayList) {
-                //noinspection unchecked
-                music = (ArrayList<SongModel>) extra;
+            ArrayList<SongModel> songs;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                songs = intent.getParcelableArrayListExtra(EXTRAS_MUSIC, SongModel.class);
+            } else {
+                //noinspection deprecation
+                songs = intent.getParcelableArrayListExtra(EXTRAS_MUSIC);
+            }
+            if (songs != null) {
+                music = songs;
                 rebuildLocalQueue();
             }
             handleAction(intent.getAction());
@@ -436,26 +438,29 @@ public class MusicService extends Service {
                                            int position) {
         return new Intent(context, MusicService.class)
                 .setAction(ACTION_PLAY_LIBRARY_QUEUE)
-                .putExtra(EXTRA_LIBRARY_QUEUE, tracks)
+                .putParcelableArrayListExtra(EXTRA_LIBRARY_QUEUE, tracks)
                 .putExtra(EXTRA_LIBRARY_POSITION, position);
     }
 
     private void playLibraryQueue(Intent intent) {
-        Object extra = intent.getSerializableExtra(EXTRA_LIBRARY_QUEUE);
-        if (!(extra instanceof ArrayList)) {
+        ArrayList<MusicTrackEntity> values;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            values = intent.getParcelableArrayListExtra(
+                    EXTRA_LIBRARY_QUEUE, MusicTrackEntity.class);
+        } else {
+            //noinspection deprecation
+            values = intent.getParcelableArrayListExtra(EXTRA_LIBRARY_QUEUE);
+        }
+        if (values == null) {
             return;
         }
-        ArrayList<?> values = (ArrayList<?>) extra;
         activeQueue.clear();
-        for (Object value : values) {
-            if (value instanceof MusicTrackEntity) {
-                MusicTrackEntity track = (MusicTrackEntity) value;
-                if (!TextUtils.isEmpty(track.source)) {
-                    activeQueue.add(new QueueItem(track.source,
-                            safeText(track.name, getString(R.string.unknown_music)),
-                            safeText(track.artist, getString(R.string.unknown_singer)),
-                            track.local));
-                }
+        for (MusicTrackEntity track : values) {
+            if (track != null && !TextUtils.isEmpty(track.source)) {
+                activeQueue.add(new QueueItem(track.source,
+                        safeText(track.name, getString(R.string.unknown_music)),
+                        safeText(track.artist, getString(R.string.unknown_singer)),
+                        track.local));
             }
         }
         if (!activeQueue.isEmpty()) {
@@ -719,38 +724,21 @@ public class MusicService extends Service {
                 prepareSource(currentSource, preferences.getBoolean(KEY_PLAYING, false),
                         preferences.getInt(KEY_POSITION, 0));
             }
-        } catch (JSONException error) {
+        } catch (RuntimeException error) {
             Log.w(TAG, "Ignoring invalid saved playback queue", error);
             activeQueue.clear();
         }
     }
 
     private String serializeQueue(List<QueueItem> items) {
-        JSONArray queue = new JSONArray();
-        for (QueueItem item : items) {
-            try {
-                queue.put(new JSONObject()
-                        .put("source", item.source)
-                        .put("name", item.name)
-                        .put("artist", item.artist)
-                        .put("local", item.local));
-            } catch (JSONException error) {
-                Log.e(TAG, "Unable to serialize playback queue", error);
-            }
-        }
-        return queue.toString();
+        return PlaybackQueueCodec.encode(items);
     }
 
-    private static void deserializeQueue(String json, List<QueueItem> output)
-            throws JSONException {
-        if (TextUtils.isEmpty(json)) {
-            return;
-        }
-        JSONArray queue = new JSONArray(json);
-        for (int i = 0; i < queue.length(); i++) {
-            JSONObject item = queue.getJSONObject(i);
-            output.add(new QueueItem(item.optString("source"), item.optString("name"),
-                    item.optString("artist"), item.optBoolean("local")));
+    private static void deserializeQueue(String json, List<QueueItem> output) {
+        for (PlaybackQueueCodec.Item item : PlaybackQueueCodec.decode(json)) {
+            if (!TextUtils.isEmpty(item.source)) {
+                output.add(new QueueItem(item.source, item.name, item.artist, item.local));
+            }
         }
     }
 
@@ -784,17 +772,9 @@ public class MusicService extends Service {
         return -1;
     }
 
-    private static final class QueueItem {
-        final String source;
-        final String name;
-        final String artist;
-        final boolean local;
-
+    private static final class QueueItem extends PlaybackQueueCodec.Item {
         QueueItem(String source, String name, String artist, boolean local) {
-            this.source = source;
-            this.name = name;
-            this.artist = artist;
-            this.local = local;
+            super(source, name, artist, local);
         }
     }
 
