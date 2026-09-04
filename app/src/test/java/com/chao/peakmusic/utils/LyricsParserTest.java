@@ -46,4 +46,15 @@ public class LyricsParserTest {
         assertEquals("中文歌词", LyricsParser.decode(
                 "中文歌词".getBytes(Charset.forName("GB18030"))));
     }
+
+    @Test
+    public void findsCurrentTimedLineWithBinarySearch() {
+        List<LyricsParser.LyricLine> lines = LyricsParser.parse(
+                "[00:01]一\n[00:03]三\n[00:05]五");
+
+        assertEquals(-1, LyricsParser.findLineAt(lines, 999));
+        assertEquals(0, LyricsParser.findLineAt(lines, 1_000));
+        assertEquals(1, LyricsParser.findLineAt(lines, 4_999));
+        assertEquals(2, LyricsParser.findLineAt(lines, 9_000));
+    }
 }

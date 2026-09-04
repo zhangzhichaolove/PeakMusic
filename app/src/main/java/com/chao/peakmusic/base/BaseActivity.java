@@ -83,7 +83,7 @@ public abstract class BaseActivity extends AppCompatActivity implements BaseInte
     @Override
     public void onClick(View view) {
         if (view.getId() == R.id.toolbar_ivb_left) {
-            onBackPressed();
+            getOnBackPressedDispatcher().onBackPressed();
         }
     }
 }

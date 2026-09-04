@@ -6,7 +6,6 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
 import java.io.File;
-import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -51,20 +50,7 @@ public class ServiceFactory {
      * @return
      */
     public synchronized <S> S createService(Class<S> serviceClass) {
-        String baseUrl = "";
-        if (serviceClass == ApiUrl.class) {
-            baseUrl = ApiAddressManager.getBaseUrl();
-        } else {
-            try {
-                Field field1 = serviceClass.getField("BASE_URL");
-                baseUrl = (String) field1.get(serviceClass);
-            } catch (NoSuchFieldException e) {
-                e.printStackTrace();
-            } catch (IllegalAccessException e) {
-                e.getMessage();
-                e.printStackTrace();
-            }
-        }
+        String baseUrl = ApiAddressManager.getBaseUrl();
         Retrofit retrofit = retrofitCache.get(baseUrl);
         if (retrofit == null) {
             Retrofit newRetrofit = new Retrofit.Builder()

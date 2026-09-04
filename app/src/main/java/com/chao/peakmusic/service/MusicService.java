@@ -26,6 +26,7 @@ import android.util.Log;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
+import androidx.core.content.IntentCompat;
 import androidx.media.app.NotificationCompat.MediaStyle;
 
 import android.support.v4.media.MediaMetadataCompat;
@@ -161,13 +162,8 @@ public class MusicService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null) {
-            ArrayList<SongModel> songs;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                songs = intent.getParcelableArrayListExtra(EXTRAS_MUSIC, SongModel.class);
-            } else {
-                //noinspection deprecation
-                songs = intent.getParcelableArrayListExtra(EXTRAS_MUSIC);
-            }
+            ArrayList<SongModel> songs = IntentCompat.getParcelableArrayListExtra(
+                    intent, EXTRAS_MUSIC, SongModel.class);
             if (songs != null) {
                 music = songs;
                 rebuildLocalQueue();
@@ -236,8 +232,6 @@ public class MusicService extends Service {
 
     private void createMediaSession() {
         mediaSession = new MediaSessionCompat(this, TAG);
-        mediaSession.setFlags(MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS
-                | MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS);
         mediaSession.setCallback(new MediaSessionCompat.Callback() {
             @Override
             public void onPlay() {
@@ -354,9 +348,7 @@ public class MusicService extends Service {
             }
             result = audioManager.requestAudioFocus(audioFocusRequest);
         } else {
-            //noinspection deprecation
-            result = audioManager.requestAudioFocus(focusChangeListener,
-                    AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
+            result = requestLegacyAudioFocus();
         }
         return result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
     }
@@ -368,9 +360,19 @@ public class MusicService extends Service {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && audioFocusRequest != null) {
             audioManager.abandonAudioFocusRequest(audioFocusRequest);
         } else {
-            //noinspection deprecation
-            audioManager.abandonAudioFocus(focusChangeListener);
+            abandonLegacyAudioFocus();
         }
+    }
+
+    @SuppressWarnings("deprecation")
+    private int requestLegacyAudioFocus() {
+        return audioManager.requestAudioFocus(focusChangeListener,
+                AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
+    }
+
+    @SuppressWarnings("deprecation")
+    private void abandonLegacyAudioFocus() {
+        audioManager.abandonAudioFocus(focusChangeListener);
     }
 
     private void openLocalTrack(int position) {
@@ -443,14 +445,8 @@ public class MusicService extends Service {
     }
 
     private void playLibraryQueue(Intent intent) {
-        ArrayList<MusicTrackEntity> values;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            values = intent.getParcelableArrayListExtra(
-                    EXTRA_LIBRARY_QUEUE, MusicTrackEntity.class);
-        } else {
-            //noinspection deprecation
-            values = intent.getParcelableArrayListExtra(EXTRA_LIBRARY_QUEUE);
-        }
+        ArrayList<MusicTrackEntity> values = IntentCompat.getParcelableArrayListExtra(
+                intent, EXTRA_LIBRARY_QUEUE, MusicTrackEntity.class);
         if (values == null) {
             return;
         }
@@ -806,8 +802,17 @@ public class MusicService extends Service {
             mediaSession = null;
         }
         activityCallbacks.kill();
-        stopForeground(true);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(STOP_FOREGROUND_REMOVE);
+        } else {
+            stopForegroundLegacy();
+        }
         super.onDestroy();
+    }
+
+    @SuppressWarnings("deprecation")
+    private void stopForegroundLegacy() {
+        stopForeground(true);
     }
 
     private final MusicAidlInterface.Stub stub = new MusicAidlInterface.Stub() {

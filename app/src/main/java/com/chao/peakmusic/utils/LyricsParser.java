@@ -98,6 +98,23 @@ public final class LyricsParser {
         return (minutes * 60 + seconds) * 1000 + milliseconds;
     }
 
+    /** Returns the last timed line at or before the playback position. */
+    public static int findLineAt(List<LyricLine> lines, long positionMs) {
+        int low = 0;
+        int high = lines.size() - 1;
+        int result = -1;
+        while (low <= high) {
+            int middle = (low + high) >>> 1;
+            if (lines.get(middle).timeMs <= positionMs) {
+                result = middle;
+                low = middle + 1;
+            } else {
+                high = middle - 1;
+            }
+        }
+        return result;
+    }
+
     public static final class LyricLine {
         public final long timeMs;
         public final String text;

@@ -70,6 +70,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class MainActivity extends BaseActivity implements NavigationView.OnNavigationItemSelectedListener, ScanningUtils.ScanningListener, PlayMusicListener {
+    private static final String TAG = "MainActivity";
     private static final long UPDATE_INTERVAL = 500;
     Toolbar mToolbar;
     TabLayout tabs;
@@ -145,7 +146,6 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
                         ? R.string.online_music : R.string.local_music)).attach();
         handler = new Handler(Looper.getMainLooper());
         ImageLoaderV4.getInstance().loadCircle(mContext, iv_album_cover, R.drawable.default_cover);
-        //getSupportFragmentManager().beginTransaction().add(R.id.fl_content, LocalMusicFragment.newInstance(), LocalMusicFragment.class.getName()).commit();
     }
 
     @Override
@@ -202,7 +202,6 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         };
 
         mDrawerToggle.syncState();
-        //vp_content.addOnPageChangeListener(presenter);
         mDrawerLayout.addDrawerListener(mDrawerToggle);
         nv_menu.setNavigationItemSelectedListener(this);
         fl_play_bar.setOnClickListener(this);
@@ -424,20 +423,20 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
                 try {
                     mService.pause();
                 } catch (RemoteException e) {
-                    e.printStackTrace();
+                    Log.e(TAG, "Unable to pause playback", e);
                 }
             } else {//当前是三角图标，点击播放
                 try {
                     mService.play();
                 } catch (RemoteException e) {
-                    e.printStackTrace();
+                    Log.e(TAG, "Unable to resume playback", e);
                 }
             }
         } else if (id == R.id.iv_next && mService != null) {
             try {
                 mService.next();
             } catch (RemoteException e) {
-                e.printStackTrace();
+                Log.e(TAG, "Unable to skip playback", e);
             }
         }
     }
@@ -457,7 +456,7 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
             pb_play_bar.setMax((int) mService.getDuration());
             pb_play_bar.setProgress(mService.getCurrentPosition());
         } catch (RemoteException e) {
-            Log.e("MainActivity", "Unable to read playback progress", e);
+            Log.e(TAG, "Unable to read playback progress", e);
         }
     }
 
@@ -475,13 +474,11 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         @Override
         public void onServiceConnected(ComponentName name, IBinder binder) {
             serviceBound = true;
-            //这里我们实例化audioService,通过binder来实现
             mService = MusicAidlInterface.Stub.asInterface(binder);
             try {
-                //注册回调，服务状态同步到UI按钮。
                 mService.registerCallback(mCallback);
             } catch (RemoteException e) {
-                e.printStackTrace();
+                Log.e(TAG, "Unable to register playback callback", e);
             }
         }
     };
@@ -641,7 +638,7 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
                 mService.openAudio(position);
             }
         } catch (RemoteException e) {
-            e.printStackTrace();
+            Log.e(TAG, "Unable to play local track", e);
         }
     }
 
@@ -677,7 +674,7 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
                 mService.playAudio(url, name, artist);
             }
         } catch (RemoteException e) {
-            e.printStackTrace();
+            Log.e(TAG, "Unable to play online track", e);
         }
     }
 

@@ -3,7 +3,6 @@ package com.chao.peakmusic.widget;
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.content.res.TypedArray;
-import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.text.TextUtils;
 import android.util.AttributeSet;
@@ -19,6 +18,7 @@ import androidx.annotation.StringRes;
 import androidx.appcompat.widget.Toolbar;
 
 import com.chao.peakmusic.R;
+import com.chao.peakmusic.databinding.LayoutToolbarBinding;
 
 
 /**
@@ -45,34 +45,23 @@ public class CustomToolbar extends Toolbar {
         initView(context, attrs);
     }
 
-    @Override
-    protected void onFinishInflate() {
-        super.onFinishInflate();
-    }
-
     private void initView(Context context, @Nullable AttributeSet attrs) {
-        //int bg = attrs.getAttributeResourceValue("http://schemas.android.com/apk/res/android", "background", 0);
-        //int bg = attrs.getAttributeIntValue("http://schemas.android.com/apk/res/android", "background", 0);
-        //TypedArray tar = getContext().obtainStyledAttributes(attrs, new int[]{android.R.attr.background, android.R.attr.text});
-        //tar.getText(1);
         TypedArray ta = context.obtainStyledAttributes(attrs, R.styleable.CustomToolbar);
         String text_title = ta.getString(R.styleable.CustomToolbar_text_title);
         Drawable left_icon = ta.getDrawable(R.styleable.CustomToolbar_left_icon);
         Drawable right_icon = ta.getDrawable(R.styleable.CustomToolbar_right_icon);
         Drawable background = ta.getDrawable(R.styleable.CustomToolbar_android_background);
-        int color = ta.getColor(R.styleable.CustomToolbar_android_background, Color.TRANSPARENT);
         ta.recycle();
-        View contentView = LayoutInflater.from(getContext()).inflate(R.layout.layout_toolbar, this, true);
-        iv_left = contentView.findViewById(R.id.toolbar_ivb_left);
-        tv_center = contentView.findViewById(R.id.toolbar_tv_title);
-        tv_right = contentView.findViewById(R.id.toolbar_tvb_right);
-        iv_right = contentView.findViewById(R.id.toolbar_ivb_right);
+        LayoutToolbarBinding binding = LayoutToolbarBinding.inflate(
+                LayoutInflater.from(getContext()), this, true);
+        iv_left = binding.toolbarIvbLeft;
+        tv_center = binding.toolbarTvTitle;
+        tv_right = binding.toolbarTvbRight;
+        iv_right = binding.toolbarIvbRight;
         if (left_icon != null) setLeftImg(left_icon);
         if (right_icon != null) setRightImg(right_icon);
         if (!TextUtils.isEmpty(text_title)) tv_center.setText(text_title);
         setBackground(background);
-        //addView(contentView);
-        //很重要
         setContentInsetsRelative(0, 0);
     }
 

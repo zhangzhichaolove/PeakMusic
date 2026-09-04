@@ -22,7 +22,9 @@ import android.widget.SeekBar;
 
 import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
+import androidx.core.content.IntentCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.LinearSmoothScroller;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.chao.peakmusic.MusicAidlInterface;
@@ -159,13 +161,8 @@ public class MusicPlayActivity extends BaseActivity {
             lyricsList.setPadding(0, verticalPadding, 0, verticalPadding);
         });
 
-        MusicModel music;
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            music = getIntent().getParcelableExtra(EXTRA_MUSIC, MusicModel.class);
-        } else {
-            //noinspection deprecation
-            music = getIntent().getParcelableExtra(EXTRA_MUSIC);
-        }
+        MusicModel music = IntentCompat.getParcelableExtra(
+                getIntent(), EXTRA_MUSIC, MusicModel.class);
         String name = music == null ? getIntent().getStringExtra(EXTRA_NAME) : music.getName();
         String singer = music == null ? getIntent().getStringExtra(EXTRA_SINGER) : music.getSinger();
         String image = music == null ? getIntent().getStringExtra(EXTRA_IMAGE) : music.getImg();
@@ -272,13 +269,7 @@ public class MusicPlayActivity extends BaseActivity {
         }
         try {
             long position = musicService.getCurrentPosition() + lyricOffsetMs;
-            int currentLine = -1;
-            for (int i = 0; i < lyricsAdapter.getItemCount(); i++) {
-                if (lyricsAdapter.getLine(i).timeMs > position) {
-                    break;
-                }
-                currentLine = i;
-            }
+            int currentLine = LyricsParser.findLineAt(lyricsAdapter.lines, position);
             if (currentLine >= 0 && lyricsAdapter.setCurrentLine(currentLine)) {
                 currentLyricLine = currentLine;
                 scrollToCurrentLyric();
@@ -304,7 +295,15 @@ public class MusicPlayActivity extends BaseActivity {
 
     private void scrollToCurrentLyric() {
         if (followCurrentLyric && currentLyricLine >= 0) {
-            lyricsList.smoothScrollToPosition(currentLyricLine);
+            LinearSmoothScroller scroller = new LinearSmoothScroller(this) {
+                @Override
+                public int calculateDtToFit(int viewStart, int viewEnd,
+                                            int boxStart, int boxEnd, int snapPreference) {
+                    return (boxStart + boxEnd) / 2 - (viewStart + viewEnd) / 2;
+                }
+            };
+            scroller.setTargetPosition(currentLyricLine);
+            lyricsLayoutManager.startSmoothScroll(scroller);
         }
     }
 
@@ -405,10 +404,6 @@ public class MusicPlayActivity extends BaseActivity {
             if (!lines.isEmpty()) {
                 notifyItemRangeInserted(0, lines.size());
             }
-        }
-
-        LyricLine getLine(int position) {
-            return lines.get(position);
         }
 
         boolean setCurrentLine(int position) {

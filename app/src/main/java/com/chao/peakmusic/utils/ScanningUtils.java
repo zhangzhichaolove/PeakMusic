@@ -118,8 +118,7 @@ public class ScanningUtils {
             }
 
         } catch (Exception e) {
-            e.printStackTrace();
-            Log.e("ScanningUtils", e.toString());
+            Log.e("ScanningUtils", "Unable to scan local music", e);
         } finally {
             if (c != null) {
                 c.close();
