@@ -6,7 +6,6 @@ import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
-import androidx.appcompat.app.AlertDialog;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -22,6 +21,8 @@ import com.chao.peakmusic.model.MusicListModel;
 import com.chao.peakmusic.model.MusicModel;
 import com.chao.peakmusic.utils.LogUtils;
 import com.chao.peakmusic.utils.MusicDataUtils;
+import com.chao.peakmusic.utils.MusicActions;
+import com.chao.peakmusic.data.MusicTrackEntity;
 
 import java.util.List;
 
@@ -88,17 +89,7 @@ public class OnLineMusicFragment extends BaseFragment {
     }
 
     private void showMusicDetails(MusicModel music) {
-        AlertDialog dialog = new AlertDialog.Builder(mContext)
-                .setTitle(R.string.music_details)
-                .setMessage(getString(R.string.online_music_details,
-                        music.getName(), music.getSinger(), music.getImg(), music.getLrc(),
-                        music.getMp3()))
-                .setPositiveButton(android.R.string.ok, null)
-                .show();
-        TextView message = dialog.findViewById(android.R.id.message);
-        if (message != null) {
-            message.setTextIsSelectable(true);
-        }
+        MusicActions.show(requireActivity(), MusicTrackEntity.from(music));
     }
 
     @Override

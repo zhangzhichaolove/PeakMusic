@@ -12,11 +12,27 @@
         android:id="@+id/action_play_mode"
         android:icon="@drawable/ic_menu_timer"
         android:title="@string/play_mode" />
+    <item
+        android:id="@+id/action_music_favorites"
+        android:icon="@drawable/ic_menu_night"
+        android:title="@string/music_favorites" />
+    <item
+        android:id="@+id/action_recently_played"
+        android:icon="@drawable/ic_menu_timer"
+        android:title="@string/recently_played" />
+    <item
+        android:id="@+id/action_playlists"
+        android:icon="@drawable/ic_menu_settings"
+        android:title="@string/playlists" />
+    <item
+        android:id="@+id/action_search_music"
+        android:icon="@drawable/ic_menu_search"
+        android:title="@string/search_music" />
     <group android:checkableBehavior="single">
         <item
             android:id="@+id/action_setting"
             android:icon="@drawable/ic_menu_settings"
-            android:title="@string/menu_setting" />
+            android:title="@string/equalizer" />
         <item
             android:id="@+id/action_night"
             android:icon="@drawable/ic_menu_night"

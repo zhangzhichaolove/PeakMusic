@@ -26,9 +26,12 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.chao.peakmusic.MusicAidlInterface;
+import com.chao.peakmusic.ActivityCall;
 import com.chao.peakmusic.R;
 import com.chao.peakmusic.base.BaseActivity;
 import com.chao.peakmusic.model.MusicModel;
+import com.chao.peakmusic.data.MusicLibraryRepository;
+import com.chao.peakmusic.data.MusicTrackEntity;
 import com.chao.peakmusic.service.MusicService;
 import com.chao.peakmusic.utils.ImageLoaderV4;
 import com.chao.peakmusic.utils.LyricsParser;
@@ -70,6 +73,9 @@ public class MusicPlayActivity extends BaseActivity {
     private MusicAidlInterface musicService;
     private boolean serviceBound;
     private String trackTitle;
+    private String currentSource;
+    private long lyricOffsetMs;
+    private TextView lyricOffsetLabel;
     private boolean hasTimedLyrics;
     private boolean userSeeking;
     private boolean followCurrentLyric = true;
@@ -98,6 +104,13 @@ public class MusicPlayActivity extends BaseActivity {
         currentTime = findViewById(R.id.playback_current_time);
         totalTime = findViewById(R.id.playback_total_time);
         followLyrics = findViewById(R.id.lyrics_follow);
+        lyricOffsetLabel = findViewById(R.id.lyric_offset_value);
+        lyricOffsetMs = getSharedPreferences("lyrics", MODE_PRIVATE)
+                .getLong("manual_offset", 0);
+        updateLyricOffsetLabel();
+        findViewById(R.id.lyric_offset_minus).setOnClickListener(view -> adjustLyricOffset(-500));
+        findViewById(R.id.lyric_offset_reset).setOnClickListener(view -> setLyricOffset(0));
+        findViewById(R.id.lyric_offset_plus).setOnClickListener(view -> adjustLyricOffset(500));
         lyricsLayoutManager = new LinearLayoutManager(this);
         lyricsAdapter = new LyricsAdapter();
         lyricsList.setLayoutManager(lyricsLayoutManager);
@@ -150,26 +163,51 @@ public class MusicPlayActivity extends BaseActivity {
         String singer = music == null ? getIntent().getStringExtra(EXTRA_SINGER) : music.getSinger();
         String image = music == null ? getIntent().getStringExtra(EXTRA_IMAGE) : music.getImg();
 
+        displayTrack(name, singer, image, music == null ? null : music.getLrc());
+
+        startAlbumAnimation();
+    }
+
+    private void displayTrack(String name, String singer, String image, String lyrics) {
         name = TextUtils.isEmpty(name) ? getString(R.string.unknown_music) : name;
         singer = TextUtils.isEmpty(singer) ? getString(R.string.unknown_singer) : singer;
         trackTitle = name;
         setTitle(trackTitle);
         mToolbar.setTitle(trackTitle);
-        TextView toolbarTitle = findViewById(R.id.toolbar_tv_title);
-        toolbarTitle.setText(trackTitle);
-        toolbarTitle.post(() -> toolbarTitle.setText(trackTitle));
         musicName.setText(name);
         musicSinger.setText(singer);
-        if (!TextUtils.isEmpty(image)) {
-            ImageLoaderV4.getInstance().load(this, albumMusic, image);
+        ImageLoaderV4.getInstance().load(this, albumMusic,
+                TextUtils.isEmpty(image) ? R.drawable.default_cover : image);
+        if (lyricsCall != null) {
+            lyricsCall.cancel();
+            lyricsCall = null;
         }
-
-        startAlbumAnimation();
-        if (music == null || TextUtils.isEmpty(music.getLrc())) {
+        currentLyricLine = -1;
+        followCurrentLyric = true;
+        followLyrics.setVisibility(View.GONE);
+        if (TextUtils.isEmpty(lyrics)) {
             showLyricsMessage(getString(R.string.lyrics_empty));
         } else {
-            loadLyrics(music.getLrc());
+            loadLyrics(lyrics);
         }
+    }
+
+    private void adjustLyricOffset(long deltaMs) {
+        setLyricOffset(Math.max(-10_000, Math.min(10_000, lyricOffsetMs + deltaMs)));
+    }
+
+    private void setLyricOffset(long offsetMs) {
+        lyricOffsetMs = offsetMs;
+        getSharedPreferences("lyrics", MODE_PRIVATE).edit()
+                .putLong("manual_offset", lyricOffsetMs).apply();
+        updateLyricOffsetLabel();
+        currentLyricLine = -1;
+        updateCurrentLyric();
+    }
+
+    private void updateLyricOffsetLabel() {
+        lyricOffsetLabel.setText(getString(R.string.lyric_offset_value,
+                lyricOffsetMs / 1000f));
     }
 
     private void startAlbumAnimation() {
@@ -223,7 +261,7 @@ public class MusicPlayActivity extends BaseActivity {
             return;
         }
         try {
-            long position = musicService.getCurrentPosition();
+            long position = musicService.getCurrentPosition() + lyricOffsetMs;
             int currentLine = -1;
             for (int i = 0; i < lyricsAdapter.getItemCount(); i++) {
                 if (lyricsAdapter.getLine(i).timeMs > position) {
@@ -270,12 +308,39 @@ public class MusicPlayActivity extends BaseActivity {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
             musicService = MusicAidlInterface.Stub.asInterface(service);
+            try {
+                musicService.registerCallback(playbackCallback);
+            } catch (RemoteException ignored) {
+            }
             updateCurrentLyric();
         }
 
         @Override
         public void onServiceDisconnected(ComponentName name) {
             musicService = null;
+        }
+    };
+
+    private final ActivityCall.Stub playbackCallback = new ActivityCall.Stub() {
+        @Override public void call(boolean isPlay) { }
+        @Override public void pre() { }
+        @Override public void next() { }
+        @Override public void defaultPlay() { }
+
+        @Override
+        public void trackChanged(String source, String name, String artist, boolean local) {
+            if (TextUtils.equals(source, currentSource)) {
+                return;
+            }
+            currentSource = source;
+            MusicLibraryRepository.get(MusicPlayActivity.this).loadTrack(source, track -> {
+                if (!TextUtils.equals(source, currentSource)) {
+                    return;
+                }
+                displayTrack(name, artist,
+                        track == null ? null : track.imageUrl,
+                        track == null ? null : track.lyricsUrl);
+            });
         }
     };
 
@@ -291,6 +356,12 @@ public class MusicPlayActivity extends BaseActivity {
     protected void onStop() {
         progressHandler.removeCallbacks(progressUpdater);
         if (serviceBound) {
+            try {
+                if (musicService != null) {
+                    musicService.unregisterCallback(playbackCallback);
+                }
+            } catch (RemoteException ignored) {
+            }
             unbindService(serviceConnection);
             serviceBound = false;
         }

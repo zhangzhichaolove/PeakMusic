@@ -9,6 +9,11 @@
     <string name="api_address_saved">API 地址已保存，后续请求将使用新地址</string>
     <string name="save">保存</string>
     <string name="restore_default">恢复默认</string>
+    <string name="test_connection">测试连接</string>
+    <string name="testing_connection">测试中…</string>
+    <string name="connection_success">连接成功：%1$s</string>
+    <string name="connection_failed">连接失败：%1$s</string>
+    <string name="cleartext_api_warning">当前地址使用明文 HTTP，请仅在可信网络中使用</string>
     <string name="cancel">取消</string>
     <string name="menu_night">夜间模式</string>
     <string name="menu_timer">定时停止</string>
@@ -32,6 +37,7 @@
     <string name="next_track">下一首</string>
     <string name="play">播放</string>
     <string name="pause">暂停</string>
+    <string name="play_pause">播放或暂停</string>
     <string name="music_loading">正在加载音乐…</string>
     <string name="music_empty">暂无音乐</string>
     <string name="music_load_failed">音乐加载失败：%1$s</string>
@@ -42,6 +48,8 @@
     <string name="local_music">本地音乐</string>
     <string name="playback_progress">播放进度</string>
     <string name="follow_current_lyric">回到当前歌词</string>
+    <string name="lyric_offset_value">歌词 %1$+.1fs</string>
+    <string name="lyric_offset_reset">归零</string>
     <string name="api_logs_title">API 响应日志</string>
     <string name="api_logs_empty">暂无大响应日志（超过 256 KiB 的响应会保存在这里）</string>
     <string name="api_log_item">%1$s\n%2$s · %3$s</string>
@@ -54,6 +62,52 @@
     <string name="play_mode">播放模式</string>
     <string name="play_mode_changed">已切换为%1$s</string>
     <string name="playback_service_unavailable">播放服务尚未就绪</string>
+    <string name="music_favorites">音乐收藏</string>
+    <string name="recently_played">最近播放</string>
+    <string name="playlists">我的歌单</string>
+    <string name="music_library_empty">这里还没有音乐</string>
+    <string name="playlists_empty">还没有歌单</string>
+    <string name="new_playlist">新建歌单</string>
+    <string name="playlist_name_required">请输入歌单名称</string>
+    <string name="playlist_track_count">%1$d 首歌曲</string>
+    <string name="create">创建</string>
+    <string name="delete">删除</string>
+    <string name="clear">清空</string>
+    <string name="delete_playlist">删除歌单</string>
+    <string name="delete_playlist_confirm">确定删除“%1$s”吗？歌曲文件不会被删除。</string>
+    <string name="remove_from_playlist">从歌单移除</string>
+    <string name="add_favorite">收藏</string>
+    <string name="remove_favorite">取消收藏</string>
+    <string name="favorite_added">已收藏</string>
+    <string name="favorite_removed">已取消收藏</string>
+    <string name="add_to_playlist">添加到歌单</string>
+    <string name="choose_playlist">选择歌单</string>
+    <string name="playlists_empty_create_first">请先在“我的歌单”中新建歌单</string>
+    <string name="added_to_playlist">已添加到“%1$s”</string>
+    <string name="copy_music_address">复制音乐地址</string>
+    <string name="music_address">音乐地址</string>
+    <string name="share_music">分享音乐</string>
+    <string name="open_music_file">使用其他应用打开</string>
+    <string name="open_music_file_failed">没有可打开此音乐的应用</string>
+    <string name="download_music">下载到音乐目录</string>
+    <string name="download_started">已开始下载</string>
+    <string name="download_failed">下载失败，请检查地址和网络</string>
+    <string name="equalizer">均衡器</string>
+    <string name="equalizer_unavailable">系统未提供均衡器控制面板</string>
+    <string name="search_music">搜索音乐</string>
+    <string name="search_music_hint">搜索歌曲、歌手或专辑</string>
+    <string name="about_content">本地与在线音乐播放器，支持后台播放、歌词、收藏、历史和自定义歌单。</string>
+    <string name="sleep_timer">睡眠定时</string>
+    <string name="sleep_timer_off">关闭定时</string>
+    <string name="sleep_timer_set">将在 %1$d 分钟后停止播放</string>
+    <string name="sleep_timer_cancelled">已关闭睡眠定时</string>
+    <string-array name="sleep_timer_options">
+        <item>关闭</item>
+        <item>15 分钟</item>
+        <item>30 分钟</item>
+        <item>60 分钟</item>
+        <item>90 分钟</item>
+    </string-array>
     <string-array name="play_modes">
         <item>顺序播放</item>
         <item>列表循环</item>

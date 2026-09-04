@@ -82,7 +82,7 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/playback_current_time" />
+        app:layout_constraintTop_toBottomOf="@id/lyric_offset_controls" />
 
     <SeekBar
         android:id="@+id/playback_progress"
@@ -117,6 +117,45 @@
         android:textSize="12sp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toBottomOf="@id/playback_progress" />
+
+    <LinearLayout
+        android:id="@+id/lyric_offset_controls"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:gravity="center"
+        android:orientation="horizontal"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/playback_current_time">
+
+        <Button
+            android:id="@+id/lyric_offset_minus"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:minWidth="48dp"
+            android:text="-0.5s" />
+
+        <TextView
+            android:id="@+id/lyric_offset_value"
+            android:layout_width="84dp"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textColor="@color/normalColor" />
+
+        <Button
+            android:id="@+id/lyric_offset_reset"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:text="@string/lyric_offset_reset" />
+
+        <Button
+            android:id="@+id/lyric_offset_plus"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:minWidth="48dp"
+            android:text="+0.5s" />
+    </LinearLayout>
 
     <Button
         android:id="@+id/lyrics_follow"

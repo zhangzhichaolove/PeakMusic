@@ -10,6 +10,8 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.chao.peakmusic.R;
 import com.chao.peakmusic.model.SongModel;
+import com.chao.peakmusic.utils.ImageLoaderV4;
+import com.chao.peakmusic.utils.ScanningUtils;
 
 import java.util.ArrayList;
 
@@ -31,7 +33,13 @@ public class LocalMusicAdapter extends RecyclerView.Adapter<LocalMusicAdapter.Ho
     @Override
     public void onBindViewHolder(LocalMusicAdapter.Holder holder, int position) {
         holder.tv_title.setText(data.get(position).getSong());
-        holder.tv_artist.setText(data.get(position).getSinger().equals("<unknown>") ? data.get(position).getAlbum() : data.get(position).getSinger());
+        holder.tv_artist.setText("<unknown>".equals(data.get(position).getSinger())
+                ? data.get(position).getAlbum() : data.get(position).getSinger());
+        Object cover = data.get(position).getAlbumId() > 0
+                ? ScanningUtils.getInstance(holder.itemView.getContext())
+                .getMediaStoreAlbumCoverUri(data.get(position).getAlbumId())
+                : R.drawable.default_cover;
+        ImageLoaderV4.getInstance().load(holder.itemView.getContext(), holder.iv_cover, cover);
         holder.itemView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {

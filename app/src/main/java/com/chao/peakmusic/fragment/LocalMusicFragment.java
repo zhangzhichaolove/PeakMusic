@@ -1,12 +1,9 @@
 package com.chao.peakmusic.fragment;
 
 import android.os.Bundle;
-import android.text.format.DateUtils;
-import android.text.format.Formatter;
-import android.widget.TextView;
 import android.view.View;
+import android.widget.TextView;
 
-import androidx.appcompat.app.AlertDialog;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -17,6 +14,8 @@ import com.chao.peakmusic.base.BaseFragment;
 import com.chao.peakmusic.listener.PlayMusicListener;
 import com.chao.peakmusic.model.SongModel;
 import com.chao.peakmusic.utils.ScanningUtils;
+import com.chao.peakmusic.utils.MusicActions;
+import com.chao.peakmusic.data.MusicTrackEntity;
 
 import java.util.ArrayList;
 
@@ -82,19 +81,7 @@ public class LocalMusicFragment extends BaseFragment {
     }
 
     private void showMusicDetails(SongModel song) {
-        String duration = DateUtils.formatElapsedTime(Math.max(0, song.getDuration()) / 1000L);
-        String size = Formatter.formatFileSize(mContext, song.getSize());
-        AlertDialog dialog = new AlertDialog.Builder(mContext)
-                .setTitle(R.string.music_details)
-                .setMessage(getString(R.string.local_music_details,
-                        song.getSong(), song.getSinger(), song.getAlbum(), duration, size,
-                        song.getFilePath()))
-                .setPositiveButton(android.R.string.ok, null)
-                .show();
-        TextView message = dialog.findViewById(android.R.id.message);
-        if (message != null) {
-            message.setTextIsSelectable(true);
-        }
+        MusicActions.show(requireActivity(), MusicTrackEntity.from(song));
     }
 
     public void setMusic(ArrayList<SongModel> music) {

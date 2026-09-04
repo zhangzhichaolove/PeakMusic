@@ -19,3 +19,6 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+# Gson reads API models reflectively.
+-keepclassmembers class com.chao.peakmusic.model.** { <fields>; }
+-keepattributes Signature,*Annotation*

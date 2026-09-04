@@ -20,6 +20,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.RemoteException;
+import android.os.RemoteCallbackList;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -36,6 +37,8 @@ import com.chao.peakmusic.MainActivity;
 import com.chao.peakmusic.MusicAidlInterface;
 import com.chao.peakmusic.R;
 import com.chao.peakmusic.model.SongModel;
+import com.chao.peakmusic.data.MusicLibraryRepository;
+import com.chao.peakmusic.data.MusicTrackEntity;
 import com.chao.peakmusic.utils.LogUtils;
 
 import java.io.IOException;
@@ -52,6 +55,15 @@ import org.json.JSONObject;
  */
 public class MusicService extends Service {
     public static final String EXTRAS_MUSIC = "extras_music";
+    public static final String ACTION_PLAY_LIBRARY_QUEUE =
+            "com.chao.peakmusic.action.PLAY_LIBRARY_QUEUE";
+    public static final String ACTION_SET_SLEEP_TIMER =
+            "com.chao.peakmusic.action.SET_SLEEP_TIMER";
+    public static final String EXTRA_LIBRARY_QUEUE = "library_queue";
+    public static final String EXTRA_LIBRARY_POSITION = "library_position";
+    public static final String EXTRA_SLEEP_DELAY = "sleep_delay";
+    public static final String SLEEP_PREFERENCES = "sleep_timer";
+    public static final String KEY_SLEEP_END = "end_time";
 
     private static final String TAG = "MusicService";
     private static final String CHANNEL_ID = "music_playback";
@@ -80,6 +92,11 @@ public class MusicService extends Service {
             mainHandler.postDelayed(this, 5000);
         }
     };
+    private final Runnable sleepTimer = () -> {
+        pausePlayback(true);
+        getSharedPreferences(SLEEP_PREFERENCES, MODE_PRIVATE).edit()
+                .remove(KEY_SLEEP_END).apply();
+    };
     private final BroadcastReceiver noisyReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -95,7 +112,7 @@ public class MusicService extends Service {
     private AudioFocusRequest audioFocusRequest;
     private ArrayList<SongModel> music = new ArrayList<>();
     private SongModel currentMusic;
-    private ActivityCall activityCall;
+    private final RemoteCallbackList<ActivityCall> activityCallbacks = new RemoteCallbackList<>();
     private boolean isLocal;
     private boolean prepared;
     private boolean resumeOnFocusGain;
@@ -140,6 +157,7 @@ public class MusicService extends Service {
         registerNoisyReceiver();
         startForeground(NOTIFICATION_ID, buildNotification());
         mainHandler.postDelayed(stateSaver, 5000);
+        restoreSleepTimer();
         LogUtils.showTagE("服务创建");
     }
 
@@ -153,6 +171,11 @@ public class MusicService extends Service {
                 rebuildLocalQueue();
             }
             handleAction(intent.getAction());
+            if (ACTION_PLAY_LIBRARY_QUEUE.equals(intent.getAction())) {
+                playLibraryQueue(intent);
+            } else if (ACTION_SET_SLEEP_TIMER.equals(intent.getAction())) {
+                setSleepTimer(intent.getLongExtra(EXTRA_SLEEP_DELAY, 0));
+            }
         }
         return START_STICKY;
     }
@@ -296,12 +319,8 @@ public class MusicService extends Service {
     private void playOrRequestDefault() {
         if (prepared) {
             startPlayback();
-        } else if (activityCall != null) {
-            try {
-                activityCall.defaultPlay();
-            } catch (RemoteException error) {
-                Log.e(TAG, "Unable to request default track", error);
-            }
+        } else {
+            broadcastCallback(ActivityCall::defaultPlay, "request default track");
         }
     }
 
@@ -377,12 +396,8 @@ public class MusicService extends Service {
                 automatic, random);
         if (next >= 0) {
             openQueueTrack(next, true);
-        } else if (activeQueue.isEmpty() && activityCall != null) {
-            try {
-                activityCall.next();
-            } catch (RemoteException error) {
-                Log.e(TAG, "Unable to request next track", error);
-            }
+        } else if (activeQueue.isEmpty()) {
+            broadcastCallback(ActivityCall::next, "request next track");
         } else {
             playWhenPrepared = false;
             updatePlaybackState(PlaybackStateCompat.STATE_STOPPED);
@@ -395,12 +410,8 @@ public class MusicService extends Service {
         int previous = PlaybackModeNavigator.previous(currentPosition, activeQueue.size(), playMode);
         if (previous >= 0) {
             openQueueTrack(previous, true);
-        } else if (activeQueue.isEmpty() && activityCall != null) {
-            try {
-                activityCall.pre();
-            } catch (RemoteException error) {
-                Log.e(TAG, "Unable to request previous track", error);
-            }
+        } else if (activeQueue.isEmpty()) {
+            broadcastCallback(ActivityCall::pre, "request previous track");
         }
     }
 
@@ -415,7 +426,76 @@ public class MusicService extends Service {
         currentTrackArtist = item.artist;
         currentSource = item.source;
         notifyTrackChanged();
+        MusicLibraryRepository.get(this).recordPlayback(currentSource,
+                currentTrackName, currentTrackArtist, isLocal);
         prepareSource(currentSource, shouldPlay, 0);
+    }
+
+    public static Intent createQueueIntent(Context context,
+                                           ArrayList<MusicTrackEntity> tracks,
+                                           int position) {
+        return new Intent(context, MusicService.class)
+                .setAction(ACTION_PLAY_LIBRARY_QUEUE)
+                .putExtra(EXTRA_LIBRARY_QUEUE, tracks)
+                .putExtra(EXTRA_LIBRARY_POSITION, position);
+    }
+
+    private void playLibraryQueue(Intent intent) {
+        Object extra = intent.getSerializableExtra(EXTRA_LIBRARY_QUEUE);
+        if (!(extra instanceof ArrayList)) {
+            return;
+        }
+        ArrayList<?> values = (ArrayList<?>) extra;
+        activeQueue.clear();
+        for (Object value : values) {
+            if (value instanceof MusicTrackEntity) {
+                MusicTrackEntity track = (MusicTrackEntity) value;
+                if (!TextUtils.isEmpty(track.source)) {
+                    activeQueue.add(new QueueItem(track.source,
+                            safeText(track.name, getString(R.string.unknown_music)),
+                            safeText(track.artist, getString(R.string.unknown_singer)),
+                            track.local));
+                }
+            }
+        }
+        if (!activeQueue.isEmpty()) {
+            int position = Math.max(0, Math.min(
+                    intent.getIntExtra(EXTRA_LIBRARY_POSITION, 0), activeQueue.size() - 1));
+            isLocal = activeQueue.get(position).local;
+            if (isLocal) {
+                localQueue.clear();
+                localQueue.addAll(activeQueue);
+            } else {
+                onlineQueue.clear();
+                onlineQueue.addAll(activeQueue);
+            }
+            openQueueTrack(position, true);
+        }
+    }
+
+    private void setSleepTimer(long delayMs) {
+        mainHandler.removeCallbacks(sleepTimer);
+        if (delayMs <= 0) {
+            getSharedPreferences(SLEEP_PREFERENCES, MODE_PRIVATE).edit()
+                    .remove(KEY_SLEEP_END).apply();
+            return;
+        }
+        long endTime = System.currentTimeMillis() + delayMs;
+        getSharedPreferences(SLEEP_PREFERENCES, MODE_PRIVATE).edit()
+                .putLong(KEY_SLEEP_END, endTime).apply();
+        mainHandler.postDelayed(sleepTimer, delayMs);
+    }
+
+    private void restoreSleepTimer() {
+        long endTime = getSharedPreferences(SLEEP_PREFERENCES, MODE_PRIVATE)
+                .getLong(KEY_SLEEP_END, 0);
+        long remaining = endTime - System.currentTimeMillis();
+        if (remaining > 0) {
+            mainHandler.postDelayed(sleepTimer, remaining);
+        } else if (endTime > 0) {
+            getSharedPreferences(SLEEP_PREFERENCES, MODE_PRIVATE).edit()
+                    .remove(KEY_SLEEP_END).apply();
+        }
     }
 
     private void seekTo(int position) {
@@ -452,23 +532,31 @@ public class MusicService extends Service {
     }
 
     private void notifyPlayingState(boolean playing) {
-        if (activityCall != null) {
-            try {
-                activityCall.call(playing);
-            } catch (RemoteException error) {
-                Log.e(TAG, "Unable to notify playback state", error);
-            }
-        }
+        broadcastCallback(callback -> callback.call(playing), "notify playback state");
     }
 
     private void notifyTrackChanged() {
-        if (activityCall != null) {
-            try {
-                activityCall.trackChanged(currentSource, currentTrackName, currentTrackArtist, isLocal);
-            } catch (RemoteException error) {
-                Log.e(TAG, "Unable to notify track change", error);
+        broadcastCallback(callback -> callback.trackChanged(currentSource,
+                currentTrackName, currentTrackArtist, isLocal), "notify track change");
+    }
+
+    private void broadcastCallback(CallbackAction action, String operation) {
+        int count = activityCallbacks.beginBroadcast();
+        try {
+            for (int i = 0; i < count; i++) {
+                try {
+                    action.run(activityCallbacks.getBroadcastItem(i));
+                } catch (RemoteException error) {
+                    Log.e(TAG, "Unable to " + operation, error);
+                }
             }
+        } finally {
+            activityCallbacks.finishBroadcast();
         }
+    }
+
+    private interface CallbackAction {
+        void run(ActivityCall callback) throws RemoteException;
     }
 
     private void updateMetadata() {
@@ -718,7 +806,6 @@ public class MusicService extends Service {
 
     @Override
     public boolean onUnbind(Intent intent) {
-        activityCall = null;
         return true;
     }
 
@@ -738,6 +825,7 @@ public class MusicService extends Service {
             mediaSession.release();
             mediaSession = null;
         }
+        activityCallbacks.kill();
         stopForeground(true);
         super.onDestroy();
     }
@@ -765,6 +853,8 @@ public class MusicService extends Service {
                 currentPosition = activeQueue.size() - 1;
             }
             notifyTrackChanged();
+            MusicLibraryRepository.get(MusicService.this).recordPlayback(url,
+                    currentTrackName, currentTrackArtist, false);
             playMusic(url);
         }
 
@@ -826,6 +916,11 @@ public class MusicService extends Service {
         }
 
         @Override
+        public int getAudioSessionId() {
+            return mediaPlayer == null ? 0 : mediaPlayer.getAudioSessionId();
+        }
+
+        @Override
         public void pre() {
             previousTrack();
         }
@@ -837,9 +932,18 @@ public class MusicService extends Service {
 
         @Override
         public void registerCallback(ActivityCall call) {
-            activityCall = call;
+            if (call != null) {
+                activityCallbacks.register(call);
+            }
             notifyTrackChanged();
             notifyPlayingState(isPlaying());
+        }
+
+        @Override
+        public void unregisterCallback(ActivityCall call) {
+            if (call != null) {
+                activityCallbacks.unregister(call);
+            }
         }
 
     };

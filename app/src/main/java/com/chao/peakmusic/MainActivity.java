@@ -6,6 +6,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.media.audiofx.AudioEffect;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
@@ -22,12 +23,15 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Button;
+import android.widget.LinearLayout;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.ActionBarDrawerToggle;
 import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatDelegate;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.GravityCompat;
@@ -37,6 +41,8 @@ import androidx.viewpager2.widget.ViewPager2;
 
 import com.chao.peakmusic.activity.MusicPlayActivity;
 import com.chao.peakmusic.activity.ApiLogActivity;
+import com.chao.peakmusic.activity.MusicLibraryActivity;
+import com.chao.peakmusic.activity.MusicSearchActivity;
 import com.chao.peakmusic.adapter.HomePageAdapter;
 import com.chao.peakmusic.base.BaseActivity;
 import com.chao.peakmusic.base.ApiAddressManager;
@@ -46,6 +52,8 @@ import com.chao.peakmusic.fragment.OnLineMusicFragment;
 import com.chao.peakmusic.listener.PlayMusicListener;
 import com.chao.peakmusic.model.MusicModel;
 import com.chao.peakmusic.model.SongModel;
+import com.chao.peakmusic.data.MusicLibraryRepository;
+import com.chao.peakmusic.data.MusicTrackEntity;
 import com.chao.peakmusic.service.MusicService;
 import com.chao.peakmusic.service.PlaybackModeNavigator;
 import com.chao.peakmusic.utils.ImageLoaderV4;
@@ -223,7 +231,91 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
             showPlayModeDialog();
             return true;
         }
+        if (item.getItemId() == R.id.action_music_favorites) {
+            startActivity(MusicLibraryActivity.intent(this, MusicLibraryActivity.MODE_FAVORITES));
+            return true;
+        }
+        if (item.getItemId() == R.id.action_recently_played) {
+            startActivity(MusicLibraryActivity.intent(this, MusicLibraryActivity.MODE_HISTORY));
+            return true;
+        }
+        if (item.getItemId() == R.id.action_playlists) {
+            startActivity(MusicLibraryActivity.intent(this, MusicLibraryActivity.MODE_PLAYLISTS));
+            return true;
+        }
+        if (item.getItemId() == R.id.action_search_music) {
+            startActivity(new Intent(this, MusicSearchActivity.class));
+            return true;
+        }
+        if (item.getItemId() == R.id.action_timer) {
+            showSleepTimerDialog();
+            return true;
+        }
+        if (item.getItemId() == R.id.action_setting) {
+            openEqualizer();
+            return true;
+        }
+        if (item.getItemId() == R.id.action_night) {
+            int current = getResources().getConfiguration().uiMode
+                    & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
+            AppCompatDelegate.setDefaultNightMode(current
+                    == android.content.res.Configuration.UI_MODE_NIGHT_YES
+                    ? AppCompatDelegate.MODE_NIGHT_NO : AppCompatDelegate.MODE_NIGHT_YES);
+            return true;
+        }
+        if (item.getItemId() == R.id.action_exit) {
+            stopService(new Intent(this, MusicService.class));
+            finishAffinity();
+            return true;
+        }
+        if (item.getItemId() == R.id.action_about) {
+            new AlertDialog.Builder(this)
+                    .setTitle(R.string.app_name)
+                    .setMessage(R.string.about_content)
+                    .setPositiveButton(android.R.string.ok, null)
+                    .show();
+            return true;
+        }
         return false;
+    }
+
+    private void showSleepTimerDialog() {
+        int[] minutes = {0, 15, 30, 60, 90};
+        String[] labels = getResources().getStringArray(R.array.sleep_timer_options);
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.sleep_timer)
+                .setItems(labels, (dialog, which) -> {
+                    long delay = minutes[which] * 60_000L;
+                    Intent intent = new Intent(this, MusicService.class)
+                            .setAction(MusicService.ACTION_SET_SLEEP_TIMER)
+                            .putExtra(MusicService.EXTRA_SLEEP_DELAY, delay);
+                    ContextCompat.startForegroundService(this, intent);
+                    ToastUtils.showToast(getString(minutes[which] == 0
+                            ? R.string.sleep_timer_cancelled : R.string.sleep_timer_set,
+                            minutes[which]));
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    private void openEqualizer() {
+        if (mService == null) {
+            ToastUtils.showToast(getString(R.string.playback_service_unavailable));
+            return;
+        }
+        try {
+            Intent intent = new Intent(AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL)
+                    .putExtra(AudioEffect.EXTRA_AUDIO_SESSION, mService.getAudioSessionId())
+                    .putExtra(AudioEffect.EXTRA_PACKAGE_NAME, getPackageName())
+                    .putExtra(AudioEffect.EXTRA_CONTENT_TYPE, AudioEffect.CONTENT_TYPE_MUSIC);
+            if (intent.resolveActivity(getPackageManager()) == null) {
+                ToastUtils.showToast(getString(R.string.equalizer_unavailable));
+            } else {
+                startActivity(intent);
+            }
+        } catch (RemoteException error) {
+            ToastUtils.showToast(getString(R.string.equalizer_unavailable));
+        }
     }
 
     private void showPlayModeDialog() {
@@ -260,11 +352,27 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         input.setText(ApiAddressManager.getBaseUrl());
         input.setSelection(input.length());
 
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        int padding = (int) (20 * getResources().getDisplayMetrics().density);
+        content.setPadding(padding, 0, padding, 0);
+        content.addView(input, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        LinearLayout actions = new LinearLayout(this);
+        Button restore = new Button(this);
+        restore.setText(R.string.restore_default);
+        Button test = new Button(this);
+        test.setText(R.string.test_connection);
+        actions.addView(restore, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        actions.addView(test, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        content.addView(actions);
+
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle(R.string.menu_api_address)
-                .setView(input)
+                .setView(content)
                 .setNegativeButton(R.string.cancel, null)
-                .setNeutralButton(R.string.restore_default, null)
                 .setPositiveButton(R.string.save, null)
                 .create();
         dialog.setOnShowListener(ignored -> {
@@ -275,11 +383,25 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
                     }
                     dialog.dismiss();
                     ToastUtils.showToast(getString(R.string.api_address_saved));
+                    if (ApiAddressManager.getBaseUrl().startsWith("http://")) {
+                        ToastUtils.showToast(getString(R.string.cleartext_api_warning));
+                    }
                     ((OnLineMusicFragment) fragments[0]).reloadMusic();
                 });
-            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(view -> {
+            restore.setOnClickListener(view -> {
                 input.setText(ApiUrl.BASE_URL);
                 input.setSelection(input.length());
+            });
+            test.setOnClickListener(view -> {
+                test.setEnabled(false);
+                test.setText(R.string.testing_connection);
+                ApiAddressManager.testConnection(input.getText().toString(), (reachable, detail) -> {
+                    test.setEnabled(true);
+                    test.setText(R.string.test_connection);
+                    ToastUtils.showToast(getString(reachable
+                                    ? R.string.connection_success : R.string.connection_failed,
+                            detail == null ? getString(R.string.unknown_error) : detail));
+                });
             });
         });
         dialog.show();
@@ -435,9 +557,9 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
             runOnUiThread(() -> {
                 if (local) {
                     currentOnlineMusic = null;
-                    currentTrackImage = null;
+                    currentTrackImage = findLocalCover(source);
                     ImageLoaderV4.getInstance().loadCircle(mContext, iv_album_cover,
-                            R.drawable.default_cover);
+                            currentTrackImage == null ? R.drawable.default_cover : currentTrackImage);
                 } else {
                     currentOnlineMusic = findOnlineMusic(source);
                     currentTrackImage = currentOnlineMusic == null ? null
@@ -457,6 +579,13 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
     protected void onDestroy() {
         handler.removeCallbacks(positionUpdater);
         if (serviceBound) {
+            try {
+                if (mService != null) {
+                    mService.unregisterCallback(mCallback);
+                }
+            } catch (RemoteException error) {
+                Log.w("MainActivity", "Unable to unregister playback callback", error);
+            }
             mContext.unbindService(conn);
             serviceBound = false;
         }
@@ -495,11 +624,17 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         currentOnlineMusic = null;
         currentTrackName = name;
         currentTrackArtist = artist;
-        currentTrackImage = null;
+        currentTrackImage = music != null && position >= 0 && position < music.size()
+                ? findLocalCover(music.get(position).getPath()) : null;
         iv_play.setSelected(true);
         tv_title.setText(name);
         tv_artist.setText(artist);
-        ImageLoaderV4.getInstance().loadCircle(mContext, iv_album_cover, R.drawable.default_cover);
+        ImageLoaderV4.getInstance().loadCircle(mContext, iv_album_cover,
+                currentTrackImage == null ? R.drawable.default_cover : currentTrackImage);
+        if (music != null && position >= 0 && position < music.size()) {
+            MusicLibraryRepository.get(this).saveMetadata(
+                    MusicTrackEntity.from(music.get(position)));
+        }
         try {
             if (mService != null) {
                 mService.openAudio(position);
@@ -519,6 +654,10 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         tv_title.setText(name);
         tv_artist.setText(artist);
         ImageLoaderV4.getInstance().loadCircle(mContext, iv_album_cover, img);
+        if (currentOnlineMusic != null) {
+            MusicLibraryRepository.get(this).saveMetadata(
+                    MusicTrackEntity.from(currentOnlineMusic));
+        }
         try {
             if (mService != null) {
                 List<MusicModel> queue = MusicDataUtils.getInstance().getMusicList();
@@ -549,6 +688,19 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         for (MusicModel musicModel : musicList) {
             if (musicModel != null && url != null && url.equals(musicModel.getMp3())) {
                 return musicModel;
+            }
+        }
+        return null;
+    }
+
+    private String findLocalCover(String source) {
+        if (music == null || source == null) {
+            return null;
+        }
+        for (SongModel song : music) {
+            if (source.equals(song.getPath()) && song.getAlbumId() > 0) {
+                return ScanningUtils.getInstance(this)
+                        .getMediaStoreAlbumCoverUri(song.getAlbumId()).toString();
             }
         }
         return null;

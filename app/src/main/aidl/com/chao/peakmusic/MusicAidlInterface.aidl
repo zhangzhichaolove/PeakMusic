@@ -65,6 +65,8 @@ interface MusicAidlInterface {
 
       int getPlayMode();
 
+      int getAudioSessionId();
+
      /**
       * 上一首
       */
@@ -76,5 +78,7 @@ interface MusicAidlInterface {
       void next();
 
       void registerCallback(ActivityCall call);
+
+      void unregisterCallback(ActivityCall call);
 
 }
