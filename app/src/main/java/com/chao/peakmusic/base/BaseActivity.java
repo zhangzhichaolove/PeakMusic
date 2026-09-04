@@ -1,17 +1,17 @@
 package com.chao.peakmusic.base;
 
 import android.content.Context;
-import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 
 import com.chao.peakmusic.R;
 import com.chao.peakmusic.utils.BarUtils;
-import com.chao.peakmusic.utils.GeneralVar;
 import com.chao.peakmusic.widget.CustomToolbar;
 
 import io.reactivex.rxjava3.disposables.CompositeDisposable;
@@ -43,17 +43,19 @@ public abstract class BaseActivity extends AppCompatActivity implements BaseInte
         mToolbar = findViewById(R.id.toolbar);
         statusBarView = findViewById(R.id.statusBarView);
         if (statusBarView != null) {
-            ViewGroup.LayoutParams statusBarLp = statusBarView.getLayoutParams();
-            statusBarLp.width = ViewGroup.LayoutParams.MATCH_PARENT;
-            statusBarLp.height = GeneralVar.getStatusHeight();
-            statusBarView.setLayoutParams(statusBarLp);
+            ViewCompat.setOnApplyWindowInsetsListener(statusBarView, (view, insets) -> {
+                ViewGroup.LayoutParams statusBarLp = view.getLayoutParams();
+                statusBarLp.width = ViewGroup.LayoutParams.MATCH_PARENT;
+                statusBarLp.height = insets.getInsets(
+                        WindowInsetsCompat.Type.statusBars()).top;
+                view.setLayoutParams(statusBarLp);
+                return insets;
+            });
+            ViewCompat.requestApplyInsets(statusBarView);
         }
         if (mToolbar != null) {
             setSupportActionBar(mToolbar);
             mToolbar.setLeftImgOnClickListener(this);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && mToolbar != null) {
-                //mToolbar.setElevation(0);
-            }
         }
         initView();
         initData();

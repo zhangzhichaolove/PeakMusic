@@ -28,7 +28,8 @@ public class MusicAlbumView extends androidx.appcompat.widget.AppCompatImageView
     private int radiusWidth = 80;
     private int strokeWidth = dp2px(radiusWidth * 2 / 3);
     private int circleWidth = dp2px(radiusWidth * 1 / 3);
-    private Rect mSrcRect, mDestRect;
+    private final Rect mSrcRect = new Rect();
+    private final Rect mDestRect = new Rect();
     private Bitmap bitmap = null;
 
     public MusicAlbumView(Context context) {
@@ -97,9 +98,11 @@ public class MusicAlbumView extends androidx.appcompat.widget.AppCompatImageView
             bitmap = toRoundBitmap(drawable.getBitmap());
         }
         //第一个Rect 代表要绘制的bitmap 区域，第二个 Rect 代表的是要将bitmap 绘制在屏幕的什么地方
-        mSrcRect = new Rect(0, 0, bitmap.getWidth(), bitmap.getHeight());
-        mDestRect = new Rect((getWidth() - strokeWidth) / 2 - circleWidth, (getHeight() - strokeWidth) / 2 - circleWidth,
-                (getWidth() - strokeWidth) / 2 - circleWidth + strokeWidth * 2, (getHeight() - strokeWidth) / 2 - circleWidth + strokeWidth * 2);
+        mSrcRect.set(0, 0, bitmap.getWidth(), bitmap.getHeight());
+        mDestRect.set((getWidth() - strokeWidth) / 2 - circleWidth,
+                (getHeight() - strokeWidth) / 2 - circleWidth,
+                (getWidth() - strokeWidth) / 2 - circleWidth + strokeWidth * 2,
+                (getHeight() - strokeWidth) / 2 - circleWidth + strokeWidth * 2);
         drawCircleBorder(canvas, strokeWidth, Color.BLACK);
         paint.setColor(Color.RED);
         //canvas.drawRect(mDestRect, paint);

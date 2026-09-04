@@ -245,9 +245,15 @@ public class MusicLibraryActivity extends AppCompatActivity {
         private final List<PlaylistSummary> items = new ArrayList<>();
 
         void setItems(List<PlaylistSummary> playlists) {
+            int previousCount = items.size();
             items.clear();
+            if (previousCount > 0) {
+                notifyItemRangeRemoved(0, previousCount);
+            }
             items.addAll(playlists);
-            notifyDataSetChanged();
+            if (!items.isEmpty()) {
+                notifyItemRangeInserted(0, items.size());
+            }
         }
 
         @NonNull

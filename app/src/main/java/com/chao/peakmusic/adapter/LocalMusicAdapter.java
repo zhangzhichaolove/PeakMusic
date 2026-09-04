@@ -65,8 +65,15 @@ public class LocalMusicAdapter extends RecyclerView.Adapter<LocalMusicAdapter.Ho
     }
 
     public void setData(ArrayList<SongModel> data) {
+        int previousCount = getItemCount();
+        this.data = null;
+        if (previousCount > 0) {
+            notifyItemRangeRemoved(0, previousCount);
+        }
         this.data = data;
-        notifyDataSetChanged();
+        if (getItemCount() > 0) {
+            notifyItemRangeInserted(0, getItemCount());
+        }
     }
 
     public void setListener(onItemClick itemClick) {

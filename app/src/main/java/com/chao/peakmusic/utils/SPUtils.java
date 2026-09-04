@@ -16,7 +16,7 @@ public class SPUtils {
 
     public static void setPrefString(final String key, final String value) {
         final SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(GeneralVar.getApplication());
-        settings.edit().putString(key, value).commit();
+        settings.edit().putString(key, value).apply();
     }
 
     public static boolean getPrefBoolean(final String key,
@@ -31,12 +31,12 @@ public class SPUtils {
 
     public static void setPrefBoolean(final String key, final boolean value) {
         final SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(GeneralVar.getApplication());
-        settings.edit().putBoolean(key, value).commit();
+        settings.edit().putBoolean(key, value).apply();
     }
 
     public static void setPrefInt(final String key, final int value) {
         final SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(GeneralVar.getApplication());
-        settings.edit().putInt(key, value).commit();
+        settings.edit().putInt(key, value).apply();
     }
 
     public static int getPrefInt(final String key, final int defaultValue) {
@@ -46,7 +46,7 @@ public class SPUtils {
 
     public static void setPrefFloat(final String key, final float value) {
         final SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(GeneralVar.getApplication());
-        settings.edit().putFloat(key, value).commit();
+        settings.edit().putFloat(key, value).apply();
     }
 
     public static float getPrefFloat(final String key, final float defaultValue) {
@@ -56,7 +56,7 @@ public class SPUtils {
 
     public static void setSettingLong(final String key, final long value) {
         final SharedPreferences settings = PreferenceManager.getDefaultSharedPreferences(GeneralVar.getApplication());
-        settings.edit().putLong(key, value).commit();
+        settings.edit().putLong(key, value).apply();
     }
 
     public static long getPrefLong(final String key, final long defaultValue) {
@@ -67,6 +67,6 @@ public class SPUtils {
     public static void clearPreference(final SharedPreferences p) {
         final Editor editor = p.edit();
         editor.clear();
-        editor.commit();
+        editor.apply();
     }
 }

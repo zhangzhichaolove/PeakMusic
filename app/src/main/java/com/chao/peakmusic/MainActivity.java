@@ -5,6 +5,7 @@ import android.app.ActivityOptions;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.ActivityNotFoundException;
 import android.content.ServiceConnection;
 import android.media.audiofx.AudioEffect;
 import android.os.Build;
@@ -308,10 +309,10 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
                     .putExtra(AudioEffect.EXTRA_AUDIO_SESSION, mService.getAudioSessionId())
                     .putExtra(AudioEffect.EXTRA_PACKAGE_NAME, getPackageName())
                     .putExtra(AudioEffect.EXTRA_CONTENT_TYPE, AudioEffect.CONTENT_TYPE_MUSIC);
-            if (intent.resolveActivity(getPackageManager()) == null) {
-                ToastUtils.showToast(getString(R.string.equalizer_unavailable));
-            } else {
+            try {
                 startActivity(intent);
+            } catch (ActivityNotFoundException error) {
+                ToastUtils.showToast(getString(R.string.equalizer_unavailable));
             }
         } catch (RemoteException error) {
             ToastUtils.showToast(getString(R.string.equalizer_unavailable));

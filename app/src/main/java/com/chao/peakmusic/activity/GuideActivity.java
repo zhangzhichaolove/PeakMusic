@@ -1,7 +1,7 @@
 package com.chao.peakmusic.activity;
 
-import android.os.Build;
 import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 
 import com.chao.peakmusic.R;
@@ -28,7 +28,7 @@ public class GuideActivity extends BaseActivity {
 
     @Override
     public void initData() {
-        mHandler = new Handler();
+        mHandler = new Handler(Looper.getMainLooper());
         mHandler.postDelayed(run, 2000);
     }
 
@@ -36,12 +36,8 @@ public class GuideActivity extends BaseActivity {
         int uiOptions = getWindow().getDecorView().getSystemUiVisibility();
         int newUiOptions = uiOptions;
         newUiOptions ^= View.SYSTEM_UI_FLAG_HIDE_NAVIGATION;
-        if (Build.VERSION.SDK_INT >= 16) {
-            newUiOptions ^= View.SYSTEM_UI_FLAG_FULLSCREEN;
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
-            newUiOptions ^= View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
-        }
+        newUiOptions ^= View.SYSTEM_UI_FLAG_FULLSCREEN;
+        newUiOptions ^= View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
         getWindow().getDecorView().setSystemUiVisibility(newUiOptions);
     }
 

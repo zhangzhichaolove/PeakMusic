@@ -395,10 +395,16 @@ public class MusicPlayActivity extends BaseActivity {
         private int currentLine = -1;
 
         void setLines(List<LyricLine> newLines) {
+            int previousCount = lines.size();
             lines.clear();
+            if (previousCount > 0) {
+                notifyItemRangeRemoved(0, previousCount);
+            }
             lines.addAll(newLines);
             currentLine = -1;
-            notifyDataSetChanged();
+            if (!lines.isEmpty()) {
+                notifyItemRangeInserted(0, lines.size());
+            }
         }
 
         LyricLine getLine(int position) {

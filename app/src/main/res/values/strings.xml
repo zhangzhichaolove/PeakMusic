@@ -22,6 +22,14 @@
     <string name="menu_share">推荐朋友</string>
     <string name="music_playing">音乐播放</string>
     <string name="album_cover">音乐封面</string>
+    <string name="user_avatar">用户头像</string>
+    <string name="navigate_back">返回</string>
+    <string name="toolbar_action">工具栏操作</string>
+    <string name="no_music">无音乐</string>
+    <string name="no_music_description">没有描述信息</string>
+    <string name="time_zero">00:00</string>
+    <string name="lyric_offset_minus">-0.5s</string>
+    <string name="lyric_offset_plus">+0.5s</string>
     <string name="lyrics">歌词</string>
     <string name="lyrics_loading">歌词加载中…</string>
     <string name="lyrics_empty">暂无歌词</string>

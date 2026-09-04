@@ -58,8 +58,15 @@ public class OnlineContentMusicAdapter extends RecyclerView.Adapter<OnlineConten
     }
 
     public void setData(List<MusicModel> data) {
+        int previousCount = getItemCount();
+        this.data = null;
+        if (previousCount > 0) {
+            notifyItemRangeRemoved(0, previousCount);
+        }
         this.data = data;
-        notifyDataSetChanged();
+        if (getItemCount() > 0) {
+            notifyItemRangeInserted(0, getItemCount());
+        }
     }
 
     public List<MusicModel> getData() {

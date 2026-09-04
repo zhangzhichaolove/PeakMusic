@@ -1,5 +1,7 @@
 package com.chao.peakmusic.utils;
 
+import android.annotation.SuppressLint;
+import android.app.Application;
 import android.content.Context;
 
 /**
@@ -8,47 +10,20 @@ import android.content.Context;
 
 public class GeneralVar {
 
-    private static Context context;
-    private static int screenWidth;
-    private static int screenHeight;
-    private static int statusHeight;
-    private static int navigationBarHeight;
+    @SuppressLint("StaticFieldLeak")
+    private static Application application;
     public static boolean deBug = true;
 
     public static void setContext(Context context) {
-        GeneralVar.context = context;
-        GeneralVar.screenWidth = ScreenUtils.getScreenWidth();
-        GeneralVar.screenHeight = ScreenUtils.getScreenHeight();
-        GeneralVar.statusHeight = ScreenUtils.getStatusHeight();
-        GeneralVar.navigationBarHeight = ScreenUtils.getNavBarHeight();
+        GeneralVar.application = (Application) context.getApplicationContext();
     }
 
     public static Context getApplication() {
-        return context;
+        return application;
     }
 
     public static Context getContext() {
-        return context;
+        return application;
     }
 
-
-    public static int getScreenWidth() {
-        return screenWidth;
-    }
-
-    public static void setScreenWidth(int screenWidth) {
-        GeneralVar.screenWidth = screenWidth;
-    }
-
-    public static int getScreenHeight() {
-        return screenHeight;
-    }
-
-    public static void setScreenHeight(int screenHeight) {
-        GeneralVar.screenHeight = screenHeight;
-    }
-
-    public static int getStatusHeight() {
-        return statusHeight;
-    }
 }
