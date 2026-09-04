@@ -1,52 +1,46 @@
-apply plugin: 'com.android.application'
+plugins {
+    id 'com.android.application'
+}
 
 android {
-    compileSdkVersion 29
-    buildToolsVersion '28.0.0'
+    namespace = 'com.chao.peakmusic'
+    compileSdk = 37
 
     defaultConfig {
-        applicationId "com.chao.peakmusic"
-        minSdkVersion 16
-        targetSdkVersion 29
-        versionCode 1
-        versionName "1.0"
-        multiDexEnabled true
-        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        applicationId = 'com.chao.peakmusic'
+        minSdk = 21
+        targetSdk = 37
+        versionCode = 1
+        versionName = '1.0'
+        testInstrumentationRunner = 'androidx.test.runner.AndroidJUnitRunner'
     }
     buildTypes {
         release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            minifyEnabled = false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
+    }
+    buildFeatures {
+        aidl = true
+        buildConfig = true
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
-}
-
-configurations.all {
-    resolutionStrategy.eachDependency { DependencyResolveDetails details ->
-        def requested = details.requested
-        if (requested.group == 'com.android.support') {
-            if (!requested.name.startsWith("multidex")) {
-                details.useVersion '26.1.0';
-            }
-        }
+    lint {
+        disable += 'NotificationPermission'
     }
 }
 
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     //implementation 'com.android.support:appcompat-v7:26.1.0'
-    implementation 'androidx.constraintlayout:constraintlayout:1.1.3'
-    testImplementation 'junit:junit:4.12'
-    androidTestImplementation 'androidx.test.ext:junit:1.1.1'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'
-    implementation 'com.jakewharton:butterknife:10.0.0'
-    implementation 'androidx.multidex:multidex:2.0.1'
-    annotationProcessor 'com.jakewharton:butterknife-compiler:10.0.0'
-    implementation 'com.google.android.material:material:1.1.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.2.1'
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
+    implementation 'com.google.android.material:material:1.13.0'
     implementation 'com.blankj:utilcode:1.13.1'
     implementation 'com.github.bumptech.glide:glide:4.0.0'
     implementation  rootProject.ext.dependencies["okhttp"]
@@ -55,6 +49,5 @@ dependencies {
     implementation  rootProject.ext.dependencies["retrofit"]
     implementation  rootProject.ext.dependencies["retrofit-converter-gson"]
     implementation  rootProject.ext.dependencies["retrofit-adapter-rxjava"]
-    //compile project(':audiowidget')
-    implementation 'com.cleveroad:audiowidget:1.0.2'
+    implementation project(':audiowidget')
 }

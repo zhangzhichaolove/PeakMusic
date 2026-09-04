@@ -15,15 +15,12 @@ import com.chao.peakmusic.utils.ScanningUtils;
 
 import java.util.ArrayList;
 
-import butterknife.BindView;
-
 /**
  * 本地音乐
  * Created by Chao on 2017-12-18.
  */
 
 public class LocalMusicFragment extends BaseFragment {
-    @BindView(R.id.local_music_list)
     RecyclerView musicList;
     private LocalMusicAdapter adapter;
     private PlayMusicListener listener;
@@ -44,6 +41,7 @@ public class LocalMusicFragment extends BaseFragment {
 
     @Override
     public void initView() {
+        musicList = rootView.findViewById(R.id.local_music_list);
         musicList.setLayoutManager(new LinearLayoutManager(mContext));
         musicList.setAdapter(adapter = new LocalMusicAdapter());
         music = music == null ? ScanningUtils.getInstance(mContext).getMusic() : music;

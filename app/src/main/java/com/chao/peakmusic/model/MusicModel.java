@@ -1,6 +1,10 @@
 package com.chao.peakmusic.model;
 
+import com.chao.peakmusic.base.ApiUrl;
+
 import java.io.Serializable;
+
+import okhttp3.HttpUrl;
 
 /**
  * Created by Chao on 2018-09-23.
@@ -51,7 +55,7 @@ public class MusicModel implements Serializable {
     }
 
     public String getImg() {
-        return img;
+        return resolveUrl(img);
     }
 
     public void setImg(String img) {
@@ -59,7 +63,7 @@ public class MusicModel implements Serializable {
     }
 
     public String getLrc() {
-        return lrc;
+        return resolveUrl(lrc);
     }
 
     public void setLrc(String lrc) {
@@ -67,10 +71,16 @@ public class MusicModel implements Serializable {
     }
 
     public String getMp3() {
-        return mp3;
+        return resolveUrl(mp3);
     }
 
     public void setMp3(String mp3) {
         this.mp3 = mp3;
+    }
+
+    private String resolveUrl(String value) {
+        HttpUrl baseUrl = HttpUrl.parse(ApiUrl.BASE_URL);
+        HttpUrl resolvedUrl = baseUrl == null || value == null ? null : baseUrl.resolve(value);
+        return resolvedUrl == null ? value : resolvedUrl.toString();
     }
 }

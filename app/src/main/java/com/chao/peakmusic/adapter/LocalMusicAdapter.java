@@ -29,14 +29,15 @@ public class LocalMusicAdapter extends RecyclerView.Adapter<LocalMusicAdapter.Ho
     }
 
     @Override
-    public void onBindViewHolder(LocalMusicAdapter.Holder holder, final int position) {
+    public void onBindViewHolder(LocalMusicAdapter.Holder holder, int position) {
         holder.tv_title.setText(data.get(position).getSong());
         holder.tv_artist.setText(data.get(position).getSinger().equals("<unknown>") ? data.get(position).getAlbum() : data.get(position).getSinger());
         holder.itemView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                if (itemClick != null) {
-                    itemClick.itemClickListener(position);
+                int adapterPosition = holder.getBindingAdapterPosition();
+                if (itemClick != null && adapterPosition != RecyclerView.NO_POSITION) {
+                    itemClick.itemClickListener(adapterPosition);
                 }
             }
         });

@@ -4,6 +4,7 @@ import android.app.Service;
 import android.content.Intent;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
@@ -160,7 +161,11 @@ public class MusicService extends Service implements AudioWidget.OnWidgetStateCh
                 mediaPlayer.stop();
             }
             mediaPlayer.reset();//重置播放器z状态
-            mediaPlayer.setDataSource(currentPath);//指定音频文件路径
+            if (currentPath.startsWith("content://")) {
+                mediaPlayer.setDataSource(this, Uri.parse(currentPath));
+            } else {
+                mediaPlayer.setDataSource(currentPath);
+            }
             mediaPlayer.setLooping(false);//设置为循环播放
             //mediaPlayer.prepare();//初始化播放器MediaPlayer
             mediaPlayer.prepareAsync();//异步初始化播放器MediaPlayer

@@ -61,12 +61,12 @@ public class ControlsClickListener implements AudioWidget.OnControlsClickListene
     }
 
     @Override
-    public boolean onPlayPauseClicked() {
+    public boolean onPlayPauseClicked(boolean isPlay) {
         try {
-            if (stub.isPlay()) {
-                stub.pause();
-            } else {
+            if (isPlay) {
                 stub.play();
+            } else {
+                stub.pause();
             }
         } catch (RemoteException e) {
             e.printStackTrace();

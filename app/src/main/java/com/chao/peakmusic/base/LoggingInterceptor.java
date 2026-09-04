@@ -2,8 +2,6 @@ package com.chao.peakmusic.base;
 
 import android.util.Log;
 
-import com.blankj.utilcode.util.LogUtils;
-
 import java.io.IOException;
 
 import okhttp3.FormBody;
@@ -43,10 +41,10 @@ public class LoggingInterceptor implements Interceptor {
         }
         Response response = chain.proceed(request);
         long t2 = System.nanoTime();//收到响应的时间 //这里不能直接使用response.body().string()的方式输出日志 //因为response.body().string()之后，response中的流会被关闭，程序会报错，我们需要创建出一 //个新的response给应用层处理
-        ResponseBody responseBody = response.peekBody(1024 * 1024);
+        ResponseBody responseBody = response.peekBody(Long.MAX_VALUE);
         //Log.e("TAG", String.format("接收响应: [%s] %n返回json:【%s】 %.1fms %n%s", response.request().url(), responseBody.string(), (t2 - t1) / 1e6d, response.headers()));
         Log.e(TAG, String.format(" %n接收响应: [%s] %.1fms %n%s", response.request().url(), (t2 - t1) / 1e6d, response.headers()));
-        LogUtils.json(TAG, responseBody.string());
+        PrettyJsonLogger.log(response.request().url().toString(), responseBody.string());
         return response;
     }
 

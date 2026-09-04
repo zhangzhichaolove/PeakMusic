@@ -14,8 +14,6 @@ import com.chao.peakmusic.utils.BarUtils;
 import com.chao.peakmusic.utils.GeneralVar;
 import com.chao.peakmusic.widget.CustomToolbar;
 
-import butterknife.ButterKnife;
-import butterknife.Unbinder;
 import io.reactivex.disposables.CompositeDisposable;
 
 /**
@@ -23,7 +21,6 @@ import io.reactivex.disposables.CompositeDisposable;
  */
 
 public abstract class BaseActivity extends AppCompatActivity implements BaseInterFace, View.OnClickListener {
-    private Unbinder bind;
     protected Context mContext;
     protected CustomToolbar mToolbar;
     protected CompositeDisposable disposables;
@@ -39,7 +36,6 @@ public abstract class BaseActivity extends AppCompatActivity implements BaseInte
         if (getLayout() != 0) {
             setContentView(getLayout());
         }
-        bind = ButterKnife.bind(this);
         init();
     }
 
@@ -68,7 +64,6 @@ public abstract class BaseActivity extends AppCompatActivity implements BaseInte
     protected void onDestroy() {
         super.onDestroy();
         disposables.clear();
-        bind.unbind();
     }
 
     @Override

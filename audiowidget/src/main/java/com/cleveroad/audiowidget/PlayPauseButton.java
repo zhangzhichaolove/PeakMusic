@@ -14,9 +14,9 @@ import android.graphics.drawable.Drawable;
 import android.os.AsyncTask;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.widget.AppCompatImageView;
 import androidx.palette.graphics.Palette;
 import android.view.animation.LinearInterpolator;
-import android.widget.ImageView;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -26,7 +26,7 @@ import java.util.Random;
  * Collapsed state view.
  */
 @SuppressLint("ViewConstructor")
-public class PlayPauseButton extends ImageView implements PlaybackState.PlaybackStateListener {
+public class PlayPauseButton extends AppCompatImageView implements PlaybackState.PlaybackStateListener {
 
     private static final float BUBBLES_ANGLE_STEP = 18.0f;
     private static final float ANIMATION_TIME_F = 8 * Configuration.FRAME_SPEED;

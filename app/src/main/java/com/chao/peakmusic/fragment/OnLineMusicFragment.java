@@ -23,7 +23,6 @@ import com.chao.peakmusic.utils.ToastUtils;
 
 import java.util.List;
 
-import butterknife.BindView;
 import io.reactivex.Observer;
 import io.reactivex.disposables.Disposable;
 
@@ -32,9 +31,7 @@ import io.reactivex.disposables.Disposable;
  */
 
 public class OnLineMusicFragment extends BaseFragment {
-    @BindView(R.id.rl_title)
     RecyclerView musicTitle;
-    @BindView(R.id.rl_content)
     RecyclerView musicContent;
 
     private OnlineTitleMusicAdapter titleMusicAdapter;
@@ -55,6 +52,8 @@ public class OnLineMusicFragment extends BaseFragment {
 
     @Override
     public void initView() {
+        musicTitle = rootView.findViewById(R.id.rl_title);
+        musicContent = rootView.findViewById(R.id.rl_content);
         //musicTitle.setLayoutManager(new GridLayoutManager(mContext, 3));
         //musicTitle.setAdapter(titleMusicAdapter = new OnlineTitleMusicAdapter());
         musicContent.setLayoutManager(new LinearLayoutManager(mContext));

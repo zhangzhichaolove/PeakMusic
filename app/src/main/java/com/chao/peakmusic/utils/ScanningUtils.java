@@ -15,7 +15,6 @@ import android.util.Log;
 
 import com.chao.peakmusic.model.SongModel;
 
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -35,8 +34,8 @@ public class ScanningUtils {
     private ContentResolver mContentResolver;
 
     private ScanningUtils(Context context) {
-        mContext = context;
-        mContentResolver = context.getContentResolver();
+        mContext = context.getApplicationContext();
+        mContentResolver = mContext.getContentResolver();
     }
 
     public static ScanningUtils getInstance(Context context) {
@@ -65,7 +64,7 @@ public class ScanningUtils {
         };
         String ORDER_BY = MediaStore.Audio.Media.DATE_ADDED + " DESC";
         String[] PROJECTIONS = {
-                MediaStore.Audio.Media.DATA, // the real path
+                MediaStore.Audio.Media._ID,
                 MediaStore.Audio.Media.TITLE,
                 MediaStore.Audio.Media.DISPLAY_NAME,
                 MediaStore.Audio.Media.MIME_TYPE,
@@ -86,11 +85,8 @@ public class ScanningUtils {
 
                 //c.getColumnNames();
 
-                String path = c.getString(c.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA));// 路径
-
-                if (!isExists(path)) {
-                    continue;
-                }
+                long id = c.getLong(c.getColumnIndexOrThrow(MediaStore.Audio.Media._ID));
+                String path = ContentUris.withAppendedId(MEDIA_URI, id).toString();
 
 //                String name = c.getString(c.getColumnIndexOrThrow(MediaStore.Audio.Media.DISPLAY_NAME)); // 歌曲名
 //                String title = c.getString(c.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)); // 歌曲名
@@ -103,7 +99,7 @@ public class ScanningUtils {
                 String name = c.getString(c.getColumnIndexOrThrow(MediaStore.Audio.Media.DISPLAY_NAME)); // 歌曲名
                 String title = c.getString(c.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)); // 歌曲名
                 String album = c.getString(c.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)); // 专辑
-                long albumId = c.getLong(c.getColumnIndex(MediaStore.Audio.AudioColumns.ALBUM_ID));// 专辑封面id，根据该id可以获得专辑封面图片
+                long albumId = c.getLong(c.getColumnIndexOrThrow(MediaStore.Audio.AudioColumns.ALBUM_ID));// 专辑封面id，根据该id可以获得专辑封面图片
                 String artist = c.getString(c.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)); // 作者
                 long size = c.getLong(c.getColumnIndexOrThrow(MediaStore.Audio.Media.SIZE));// 大小
                 int duration = c.getInt(c.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION));// 时长
@@ -129,17 +125,6 @@ public class ScanningUtils {
             listener.onScanningMusicComplete(musics);
         }
         return musics;
-    }
-
-    /**
-     * 判断文件是否存在
-     *
-     * @param path 文件的路径
-     * @return
-     */
-    private boolean isExists(String path) {
-        File file = new File(path);
-        return file.exists();
     }
 
     public Uri getMediaStoreAlbumCoverUri(long albumId) {

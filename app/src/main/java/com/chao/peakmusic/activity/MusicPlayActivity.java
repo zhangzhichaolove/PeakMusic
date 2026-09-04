@@ -8,14 +8,11 @@ import com.chao.peakmusic.R;
 import com.chao.peakmusic.base.BaseActivity;
 import com.chao.peakmusic.widget.MusicAlbumView;
 
-import butterknife.BindView;
-
 /**
  * Created by Chao on 2017-12-19.
  */
 
 public class MusicPlayActivity extends BaseActivity {
-    @BindView(R.id.album_music)
     MusicAlbumView album_music;
 
     @Override
@@ -25,6 +22,7 @@ public class MusicPlayActivity extends BaseActivity {
 
     @Override
     public void initView() {
+        album_music = findViewById(R.id.album_music);
         ObjectAnimator animator = ObjectAnimator.ofFloat(album_music, "rotation", 0, 360);
         animator.setDuration(8000);
         animator.setInterpolator(new LinearInterpolator());

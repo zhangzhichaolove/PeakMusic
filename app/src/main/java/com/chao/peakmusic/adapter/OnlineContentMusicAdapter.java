@@ -30,18 +30,19 @@ public class OnlineContentMusicAdapter extends RecyclerView.Adapter<OnlineConten
     }
 
     @Override
-    public void onBindViewHolder(OnlineContentMusicAdapter.Holder holder, final int position) {
+    public void onBindViewHolder(OnlineContentMusicAdapter.Holder holder, int position) {
         holder.tv_title.setText(data.get(position).getName());
         holder.tv_artist.setText(data.get(position).getSinger());
+        ImageLoaderV4.getInstance().load(holder.itemView.getContext(), holder.iv_cover, data.get(position).getImg());
         holder.itemView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                if (itemClick != null) {
-                    itemClick.itemClickListener(position);
+                int adapterPosition = holder.getBindingAdapterPosition();
+                if (itemClick != null && adapterPosition != RecyclerView.NO_POSITION) {
+                    itemClick.itemClickListener(adapterPosition);
                 }
             }
         });
-        ImageLoaderV4.getInstance().load(holder.itemView.getContext(), holder.iv_cover, data.get(position).getImg());
     }
 
     @Override

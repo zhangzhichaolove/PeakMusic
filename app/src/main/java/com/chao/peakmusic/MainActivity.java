@@ -1,5 +1,6 @@
 package com.chao.peakmusic;
 
+import android.Manifest;
 import android.app.ActivityOptions;
 import android.content.ComponentName;
 import android.content.Context;
@@ -11,6 +12,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.RemoteException;
+import android.content.pm.PackageManager;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -25,6 +27,8 @@ import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.ActionBarDrawerToggle;
 import androidx.appcompat.widget.Toolbar;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.fragment.app.Fragment;
@@ -55,34 +59,21 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import butterknife.BindView;
-
 public class MainActivity extends BaseActivity implements NavigationView.OnNavigationItemSelectedListener, ScanningUtils.ScanningListener, PlayMusicListener {
     private static final long UPDATE_INTERVAL = 500;
     private static final int OVERLAY_PERMISSION_REQ_CODE = 66;
-    @BindView(R.id.mToolbar)
+    private static final int AUDIO_PERMISSION_REQ_CODE = 67;
     Toolbar mToolbar;
-    @BindView(R.id.tabs)
     TabLayout tabs;
-    @BindView(R.id.dl_left)
     DrawerLayout mDrawerLayout;
-    @BindView(R.id.id_nv_menu)
     NavigationView nv_menu;
-    @BindView(R.id.vp_content)
     ViewPager vp_content;
-    @BindView(R.id.fl_play_bar)
     FrameLayout fl_play_bar;
-    @BindView(R.id.iv_play_bar_cover)
     ImageView iv_album_cover;
-    @BindView(R.id.iv_play)
     ImageView iv_play;
-    @BindView(R.id.iv_next)
     ImageView iv_next;
-    @BindView(R.id.pb_play_bar)
     ProgressBar pb_play_bar;
-    @BindView(R.id.tv_title)
     TextView tv_title;
-    @BindView(R.id.tv_artist)
     TextView tv_artist;
     private Handler handler;
     private Fragment[] fragments;
@@ -97,6 +88,18 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
 
     @Override
     public void initView() {
+        mToolbar = findViewById(R.id.mToolbar);
+        tabs = findViewById(R.id.tabs);
+        mDrawerLayout = findViewById(R.id.dl_left);
+        nv_menu = findViewById(R.id.id_nv_menu);
+        vp_content = findViewById(R.id.vp_content);
+        fl_play_bar = findViewById(R.id.fl_play_bar);
+        iv_album_cover = findViewById(R.id.iv_play_bar_cover);
+        iv_play = findViewById(R.id.iv_play);
+        iv_next = findViewById(R.id.iv_next);
+        pb_play_bar = findViewById(R.id.pb_play_bar);
+        tv_title = findViewById(R.id.tv_title);
+        tv_artist = findViewById(R.id.tv_artist);
         mToolbar.setTitle("");
         mToolbar.setLogo(R.drawable.menu_setting_icon);
         setSupportActionBar(mToolbar);
@@ -114,22 +117,56 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
 
     @Override
     public void initData() {
+        if (hasMusicPermission()) {
+            loadMusic();
+            requestOverlayPermission();
+        } else {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                            ? Manifest.permission.READ_MEDIA_AUDIO
+                            : Manifest.permission.READ_EXTERNAL_STORAGE},
+                    AUDIO_PERMISSION_REQ_CODE);
+        }
+        startTrackingPosition();
+    }
+
+    private void loadMusic() {
         if (ScanningUtils.getInstance(mContext).getMusic() == null) {
             ScanningUtils.getInstance(mContext).setListener(this).scanMusic();
         } else {
             onScanningMusicComplete(ScanningUtils.getInstance(mContext).getMusic());
         }
-        startTrackingPosition();
-        requestPermission();
+    }
+
+    private boolean hasMusicPermission() {
+        String permission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                ? Manifest.permission.READ_MEDIA_AUDIO
+                : Manifest.permission.READ_EXTERNAL_STORAGE;
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.M
+                || ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED;
     }
 
     /**
      * 请求悬浮权限
      */
-    void requestPermission() {
+    void requestOverlayPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
             Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName()));
             startActivityForResult(intent, OVERLAY_PERMISSION_REQ_CODE);
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == AUDIO_PERMISSION_REQ_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                loadMusic();
+            } else {
+                onScanningMusicComplete(new ArrayList<>());
+            }
+            requestOverlayPermission();
         }
     }
 
@@ -221,18 +258,6 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
 
     @Override
     public boolean onNavigationItemSelected(@NonNull MenuItem item) {
-        switch (item.getItemId()) {
-            case R.id.action_setting:
-                break;
-            case R.id.action_night:
-                break;
-            case R.id.action_timer:
-                break;
-            case R.id.action_exit:
-                break;
-            case R.id.action_about:
-                break;
-        }
         if (mDrawerLayout.isDrawerOpen(GravityCompat.START)) {
             mDrawerLayout.closeDrawer(GravityCompat.START);
         }
@@ -243,40 +268,32 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
     @Override
     public void onClick(View view) {
         super.onClick(view);
-        switch (view.getId()) {
-            case R.id.fl_play_bar:
-                Intent intent = new Intent(mContext, MusicPlayActivity.class);
-                startActivity(intent, ActivityOptions.makeSceneTransitionAnimation(this, iv_album_cover, "album").toBundle());
-                break;
-            case R.id.iv_play://默认按钮激活状态是false，显示三角图标。
-                if (mService != null) {
-                    if (iv_play.isSelected()) {//当前是暂停图标
-                        try {
-                            mService.pause();
-                            mService.clickButton(false);
-                        } catch (RemoteException e) {
-                            e.printStackTrace();
-                        }
-                    } else {//当前是三角图标，点击播放
-                        try {
-                            mService.play();
-                            mService.clickButton(true);
-                        } catch (RemoteException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                    //iv_play.setSelected(!iv_play.isSelected());
+        int id = view.getId();
+        if (id == R.id.fl_play_bar) {
+            Intent intent = new Intent(mContext, MusicPlayActivity.class);
+            startActivity(intent, ActivityOptions.makeSceneTransitionAnimation(this, iv_album_cover, "album").toBundle());
+        } else if (id == R.id.iv_play && mService != null) {
+            if (iv_play.isSelected()) {//当前是暂停图标
+                try {
+                    mService.pause();
+                    mService.clickButton(false);
+                } catch (RemoteException e) {
+                    e.printStackTrace();
                 }
-                break;
-            case R.id.iv_next:
-                if (mService != null) {
-                    try {
-                        mService.next();
-                    } catch (RemoteException e) {
-                        e.printStackTrace();
-                    }
+            } else {//当前是三角图标，点击播放
+                try {
+                    mService.play();
+                    mService.clickButton(true);
+                } catch (RemoteException e) {
+                    e.printStackTrace();
                 }
-                break;
+            }
+        } else if (id == R.id.iv_next && mService != null) {
+            try {
+                mService.next();
+            } catch (RemoteException e) {
+                e.printStackTrace();
+            }
         }
     }
 

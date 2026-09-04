@@ -24,7 +24,7 @@ public interface ApiUrl {
 //    Observable<HttpResult<MusicDetailsResultModel>> getMusicDetails(@Query("id") int id);
 
 
-    String BASE_URL = "http://home.peakchao.com:250/";
+    String BASE_URL = "http://nas.peakchao.kdns.fr:55008/";
 
 
     @GET("music/getMusicBanner")

@@ -12,10 +12,10 @@ import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.widget.AppCompatImageView;
 import android.util.Log;
 import android.view.animation.Interpolator;
 import android.view.animation.LinearInterpolator;
-import android.widget.ImageView;
 
 import java.util.Random;
 
@@ -23,7 +23,7 @@ import java.util.Random;
  * Expanded state view.
  */
 @SuppressLint("ViewConstructor")
-public class ExpandCollapseWidget extends ImageView implements PlaybackState.PlaybackStateListener {
+public class ExpandCollapseWidget extends AppCompatImageView implements PlaybackState.PlaybackStateListener {
 
     static final int DIRECTION_LEFT = 1;
     static final int DIRECTION_RIGHT = 2;
