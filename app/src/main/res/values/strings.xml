@@ -14,4 +14,11 @@
     <string name="menu_exit">退出应用</string>
     <string name="menu_about">关于作者</string>
     <string name="menu_share">推荐朋友</string>
+    <string name="music_playing">音乐播放</string>
+    <string name="album_cover">音乐封面</string>
+    <string name="lyrics">歌词</string>
+    <string name="lyrics_loading">歌词加载中…</string>
+    <string name="lyrics_empty">暂无歌词</string>
+    <string name="unknown_music">暂无正在播放的音乐</string>
+    <string name="unknown_singer">未知歌手</string>
 </resources>

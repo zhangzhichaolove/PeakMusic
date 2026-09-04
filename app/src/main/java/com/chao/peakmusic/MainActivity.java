@@ -84,6 +84,10 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
     private HomePageAdapter pageAdapter;
     private ScheduledExecutorService timer;
     private ArrayList<SongModel> music;
+    private MusicModel currentOnlineMusic;
+    private String currentTrackName;
+    private String currentTrackArtist;
+    private String currentTrackImage;
 
     @Override
     public int getLayout() {
@@ -304,6 +308,10 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         int id = view.getId();
         if (id == R.id.fl_play_bar) {
             Intent intent = new Intent(mContext, MusicPlayActivity.class);
+            intent.putExtra(MusicPlayActivity.EXTRA_MUSIC, currentOnlineMusic);
+            intent.putExtra(MusicPlayActivity.EXTRA_NAME, currentTrackName);
+            intent.putExtra(MusicPlayActivity.EXTRA_SINGER, currentTrackArtist);
+            intent.putExtra(MusicPlayActivity.EXTRA_IMAGE, currentTrackImage);
             startActivity(intent, ActivityOptions.makeSceneTransitionAnimation(this, iv_album_cover, "album").toBundle());
         } else if (id == R.id.iv_play && mService != null) {
             if (iv_play.isSelected()) {//当前是暂停图标
@@ -474,6 +482,10 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
 
     @Override
     public void playMusic(int position, String name, String artist) {
+        currentOnlineMusic = null;
+        currentTrackName = name;
+        currentTrackArtist = artist;
+        currentTrackImage = null;
         iv_play.setSelected(true);
         tv_title.setText(name);
         tv_artist.setText(artist);
@@ -490,6 +502,10 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
 
     @Override
     public void playMusic(String url, String name, String artist, String img) {
+        currentOnlineMusic = findOnlineMusic(url);
+        currentTrackName = name;
+        currentTrackArtist = artist;
+        currentTrackImage = img;
         iv_play.setSelected(true);
         tv_title.setText(name);
         tv_artist.setText(artist);
@@ -502,5 +518,18 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         } catch (RemoteException e) {
             e.printStackTrace();
         }
+    }
+
+    private MusicModel findOnlineMusic(String url) {
+        List<MusicModel> musicList = MusicDataUtils.getInstance().getMusicList();
+        if (musicList == null) {
+            return null;
+        }
+        for (MusicModel musicModel : musicList) {
+            if (musicModel.getMp3().equals(url)) {
+                return musicModel;
+            }
+        }
+        return null;
     }
 }
