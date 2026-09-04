@@ -576,6 +576,7 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
     @Override
     protected void onDestroy() {
         handler.removeCallbacks(positionUpdater);
+        ScanningUtils.getInstance(this).clearListener(this);
         if (serviceBound) {
             try {
                 if (mService != null) {
