@@ -18,6 +18,7 @@ import androidx.core.content.FileProvider;
 
 import com.chao.peakmusic.R;
 import com.chao.peakmusic.base.ApiResponseLogStore;
+import com.chao.peakmusic.base.PrettyJsonFormatter;
 import com.chao.peakmusic.utils.ToastUtils;
 
 import java.io.File;
@@ -89,12 +90,15 @@ public final class ApiLogActivity extends AppCompatActivity {
 
     private String read(File file) {
         try {
+            String body;
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                return new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
+                body = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
+            } else {
+                try (okio.BufferedSource source = okio.Okio.buffer(okio.Okio.source(file))) {
+                    body = source.readUtf8();
+                }
             }
-            try (okio.BufferedSource source = okio.Okio.buffer(okio.Okio.source(file))) {
-                return source.readUtf8();
-            }
+            return PrettyJsonFormatter.format(body);
         } catch (IOException error) {
             return getString(R.string.api_log_read_failed, error.getMessage());
         }
