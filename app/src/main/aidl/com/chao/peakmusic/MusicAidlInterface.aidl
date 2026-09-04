@@ -12,7 +12,7 @@ interface MusicAidlInterface {
   /**
       * 打开一个音频文件
       */
-      void playAudio(String url);
+      void playAudio(String url, String name, String artist);
 
      /**
       * 播放
@@ -70,18 +70,6 @@ interface MusicAidlInterface {
       */
       void next();
 
-     /**
-      * 显示悬浮控件
-      */
-      void show();
-
-     /**
-      * 隐藏悬浮控件
-      */
-      void hide();
-
       void registerCallback(ActivityCall call);
-
-      void clickButton(boolean isPlay);
 
 }

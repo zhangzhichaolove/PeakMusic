@@ -12,4 +12,6 @@ interface ActivityCall {
     void next();
 
     void defaultPlay();
+
+    void trackChanged(String name, String artist, boolean local);
 }

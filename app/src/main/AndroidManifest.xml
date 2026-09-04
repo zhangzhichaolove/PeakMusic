@@ -3,13 +3,13 @@
 
     <!-- 访问网络，网络定位需要上网-->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
-    <!--audiowidget-->
-    <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <application
         android:name=".App"
@@ -34,19 +34,7 @@
             android:name=".service.MusicService"
             android:enabled="true"
             android:exported="false"
-            android:process=":remote" />
-
-        <!--android:process=":remote"-->
-
-
-        <service
-            android:name=".service.TestService"
-            android:enabled="true"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="com.chao.peakmusic.action.MUSIC_SERVICE" />
-            </intent-filter>
-        </service>
+            android:foregroundServiceType="mediaPlayback" />
 
         <activity
             android:name=".MainActivity"

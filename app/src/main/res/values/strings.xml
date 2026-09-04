@@ -8,6 +8,7 @@
     <string name="api_address_invalid">请输入以 http:// 或 https:// 开头的有效地址</string>
     <string name="api_address_saved">API 地址已保存，后续请求将使用新地址</string>
     <string name="save">保存</string>
+    <string name="restore_default">恢复默认</string>
     <string name="cancel">取消</string>
     <string name="menu_night">夜间模式</string>
     <string name="menu_timer">定时停止</string>
@@ -24,4 +25,17 @@
     <string name="music_details">音乐详情</string>
     <string name="online_music_details">名称：%1$s\n歌手：%2$s\n封面地址：%3$s\n歌词地址：%4$s\n音乐地址：%5$s</string>
     <string name="local_music_details">歌曲名：%1$s\n歌手：%2$s\n专辑：%3$s\n时长：%4$s\n大小：%5$s\n音乐地址：%6$s</string>
+    <string name="playback_notification_channel">音乐播放</string>
+    <string name="playback_notification_channel_description">显示正在播放的音乐和播放控制</string>
+    <string name="playback_ready">准备播放</string>
+    <string name="previous_track">上一首</string>
+    <string name="next_track">下一首</string>
+    <string name="play">播放</string>
+    <string name="pause">暂停</string>
+    <string name="music_loading">正在加载音乐…</string>
+    <string name="music_empty">暂无音乐</string>
+    <string name="music_load_failed">音乐加载失败：%1$s</string>
+    <string name="retry">重试</string>
+    <string name="unknown_error">未知错误</string>
+    <string name="local_music_empty">未找到本地音乐，请确认已授予音乐访问权限</string>
 </resources>

@@ -1,7 +1,5 @@
 package com.chao.peakmusic.base;
 
-import android.os.Environment;
-
 import com.chao.peakmusic.BuildConfig;
 import com.chao.peakmusic.utils.GeneralVar;
 import com.google.gson.Gson;
@@ -9,6 +7,8 @@ import com.google.gson.GsonBuilder;
 
 import java.io.File;
 import java.lang.reflect.Field;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import okhttp3.Cache;
@@ -25,11 +25,14 @@ import retrofit2.converter.gson.GsonConverterFactory;
 public class ServiceFactory {
 
     private final Gson mGsonDateFormat;
+    private final OkHttpClient okHttpClient;
+    private final Map<String, Retrofit> retrofitCache = new ConcurrentHashMap<>();
 
     public ServiceFactory() {
         mGsonDateFormat = new GsonBuilder()
                 .setDateFormat("yyyy-MM-dd hh:mm:ss")
                 .create();
+        okHttpClient = createOkHttpClient();
     }
 
     private static class SingletonHolder {
@@ -47,7 +50,7 @@ public class ServiceFactory {
      * @param <S>
      * @return
      */
-    public <S> S createService(Class<S> serviceClass) {
+    public synchronized <S> S createService(Class<S> serviceClass) {
         String baseUrl = "";
         if (serviceClass == ApiUrl.class) {
             baseUrl = ApiAddressManager.getBaseUrl();
@@ -62,18 +65,23 @@ public class ServiceFactory {
                 e.printStackTrace();
             }
         }
-        Retrofit retrofit = new Retrofit.Builder()
-                .baseUrl(baseUrl)
-                .client(getOkHttpClient())
-                .addConverterFactory(GsonConverterFactory.create(mGsonDateFormat))
-                .addCallAdapterFactory(RxJava2CallAdapterFactory.create())
-                .build();
+        Retrofit retrofit = retrofitCache.get(baseUrl);
+        if (retrofit == null) {
+            Retrofit newRetrofit = new Retrofit.Builder()
+                    .baseUrl(baseUrl)
+                    .client(okHttpClient)
+                    .addConverterFactory(GsonConverterFactory.create(mGsonDateFormat))
+                    .addCallAdapterFactory(RxJava2CallAdapterFactory.create())
+                    .build();
+            retrofitCache.put(baseUrl, newRetrofit);
+            retrofit = newRetrofit;
+        }
         return retrofit.create(serviceClass);
     }
 
     private final static long DEFAULT_TIMEOUT = 30;
 
-    private OkHttpClient getOkHttpClient() {
+    private OkHttpClient createOkHttpClient() {
         //定制OkHttp
         OkHttpClient.Builder httpClientBuilder = new OkHttpClient.Builder();
         //设置超时时间
@@ -81,8 +89,7 @@ public class ServiceFactory {
         httpClientBuilder.writeTimeout(DEFAULT_TIMEOUT, TimeUnit.SECONDS);
         httpClientBuilder.readTimeout(DEFAULT_TIMEOUT, TimeUnit.SECONDS);
         //设置缓存
-        File httpCacheDirectory = new File(Environment.getExternalStorageDirectory()
-                + File.separator + GeneralVar.getApplication().getPackageName() + File.separator, "cache");
+        File httpCacheDirectory = new File(GeneralVar.getApplication().getCacheDir(), "http_cache");
         httpClientBuilder.cache(new Cache(httpCacheDirectory, 10 * 1024 * 1024));
 
         if (BuildConfig.DEBUG) {

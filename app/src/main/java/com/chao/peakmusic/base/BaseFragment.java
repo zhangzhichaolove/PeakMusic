@@ -53,8 +53,17 @@ public abstract class BaseFragment extends Fragment implements BaseInterFace {
     }
 
     @Override
-    public void onDestroy() {
-        super.onDestroy();
-        disposables.clear();
+    public void onDestroyView() {
+        if (disposables != null) {
+            disposables.clear();
+        }
+        rootView = null;
+        super.onDestroyView();
+    }
+
+    @Override
+    public void onDetach() {
+        mContext = null;
+        super.onDetach();
     }
 }

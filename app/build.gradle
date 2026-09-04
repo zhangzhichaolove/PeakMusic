@@ -37,6 +37,9 @@ dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     //implementation 'com.android.support:appcompat-v7:26.1.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.2.1'
+    implementation 'androidx.appcompat:appcompat:1.7.1'
+    implementation 'androidx.recyclerview:recyclerview:1.4.0'
+    implementation 'androidx.media:media:1.7.0'
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.2.1'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
@@ -49,5 +52,4 @@ dependencies {
     implementation  rootProject.ext.dependencies["retrofit"]
     implementation  rootProject.ext.dependencies["retrofit-converter-gson"]
     implementation  rootProject.ext.dependencies["retrofit-adapter-rxjava"]
-    implementation project(':audiowidget')
 }

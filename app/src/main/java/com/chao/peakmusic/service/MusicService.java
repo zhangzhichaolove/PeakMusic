@@ -1,7 +1,16 @@
 package com.chao.peakmusic.service;
 
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.media.AudioAttributes;
+import android.media.AudioFocusRequest;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.net.Uri;
@@ -10,451 +19,582 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.RemoteException;
+import android.text.TextUtils;
+import android.util.Log;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.annotation.RequiresApi;
+import androidx.core.app.NotificationCompat;
+import androidx.media.app.NotificationCompat.MediaStyle;
+
+import android.support.v4.media.MediaMetadataCompat;
+import android.support.v4.media.session.MediaSessionCompat;
+import android.support.v4.media.session.PlaybackStateCompat;
 
 import com.chao.peakmusic.ActivityCall;
+import com.chao.peakmusic.MainActivity;
 import com.chao.peakmusic.MusicAidlInterface;
-import com.chao.peakmusic.listener.ControlsClickListener;
-import com.chao.peakmusic.model.MusicModel;
+import com.chao.peakmusic.R;
 import com.chao.peakmusic.model.SongModel;
 import com.chao.peakmusic.utils.LogUtils;
-import com.chao.peakmusic.utils.MusicDataUtils;
-import com.chao.peakmusic.utils.SPUtils;
-import com.chao.peakmusic.utils.ScreenUtils;
-import com.chao.peakmusic.utils.ToastUtils;
-import com.cleveroad.audiowidget.AudioWidget;
 
-import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.util.ArrayList;
-import java.util.List;
-import java.util.Timer;
-import java.util.TimerTask;
-
 
 /**
- * 音乐后台服务
- * Created by Chao on 2017-12-19.
+ * Music playback service with audio focus, MediaSession and foreground controls.
  */
-
-public class MusicService extends Service implements AudioWidget.OnWidgetStateChangedListener {
-
+public class MusicService extends Service {
     public static final String EXTRAS_MUSIC = "extras_music";
-    private static final String TAG = "MusicService";
-    private static final long UPDATE_INTERVAL = 1000;
-    private Handler mHandler;
-    private Timer timer;
-    private ActivityCall activityCall;
 
-    private AudioWidget audioWidget;
-    private MediaPlayer mediaPlayer = null;
-    private ControlsClickListener controlsClickListener;
-    private ArrayList<SongModel> music;
+    private static final String TAG = "MusicService";
+    private static final String CHANNEL_ID = "music_playback";
+    private static final int NOTIFICATION_ID = 1001;
+    private static final String ACTION_PREVIOUS = "com.chao.peakmusic.action.PREVIOUS";
+    private static final String ACTION_TOGGLE = "com.chao.peakmusic.action.TOGGLE";
+    private static final String ACTION_NEXT = "com.chao.peakmusic.action.NEXT";
+
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final BroadcastReceiver noisyReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (AudioManager.ACTION_AUDIO_BECOMING_NOISY.equals(intent.getAction())) {
+                pausePlayback(true);
+            }
+        }
+    };
+
+    private MediaPlayer mediaPlayer;
+    private MediaSessionCompat mediaSession;
+    private AudioManager audioManager;
+    private AudioFocusRequest audioFocusRequest;
+    private ArrayList<SongModel> music = new ArrayList<>();
     private SongModel currentMusic;
-    private List<MusicModel> musicList;
+    private ActivityCall activityCall;
     private boolean isLocal;
+    private boolean prepared;
+    private boolean resumeOnFocusGain;
     private int currentPosition = -1;
-    private boolean isPlaying = false;
+    private String currentTrackName = "PeakMusic";
+    private String currentTrackArtist = "";
+
+    private final AudioManager.OnAudioFocusChangeListener focusChangeListener = focusChange -> {
+        if (focusChange == AudioManager.AUDIOFOCUS_GAIN) {
+            if (mediaPlayer != null) {
+                mediaPlayer.setVolume(1f, 1f);
+            }
+            if (resumeOnFocusGain) {
+                resumeOnFocusGain = false;
+                startPlayback();
+            }
+        } else if (focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK) {
+            if (mediaPlayer != null) {
+                mediaPlayer.setVolume(0.2f, 0.2f);
+            }
+        } else if (focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
+            resumeOnFocusGain = isPlaying();
+            pausePlayback(true);
+        } else if (focusChange == AudioManager.AUDIOFOCUS_LOSS) {
+            resumeOnFocusGain = false;
+            pausePlayback(true);
+        }
+    };
 
     @Override
     public void onCreate() {
         super.onCreate();
-        mHandler = new Handler(Looper.getMainLooper());
-        audioWidget = new AudioWidget.Builder(this).build();
-        controlsClickListener = new ControlsClickListener(stub, this);
-        audioWidget.controller().onControlsClickListener(controlsClickListener);
-        audioWidget.controller().onWidgetStateChangedListener(this);
-        //audioWidget.controller().stop();
+        audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        createNotificationChannel();
+        createMediaSession();
+        createPlayer();
+        registerNoisyReceiver();
+        startForeground(NOTIFICATION_ID, buildNotification());
         LogUtils.showTagE("服务创建");
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        LogUtils.showTagE("服务启动");
-        music = (ArrayList<SongModel>) intent.getSerializableExtra(EXTRAS_MUSIC);
-        startTrackingPosition();
-        return super.onStartCommand(intent, flags, startId);
+        if (intent != null) {
+            Object extra = intent.getSerializableExtra(EXTRAS_MUSIC);
+            if (extra instanceof ArrayList) {
+                //noinspection unchecked
+                music = (ArrayList<SongModel>) extra;
+            }
+            handleAction(intent.getAction());
+        }
+        return START_STICKY;
+    }
 
+    private void handleAction(String action) {
+        if (ACTION_PREVIOUS.equals(action)) {
+            previousTrack();
+        } else if (ACTION_TOGGLE.equals(action)) {
+            if (isPlaying()) {
+                pausePlayback(true);
+            } else {
+                startPlayback();
+            }
+        } else if (ACTION_NEXT.equals(action)) {
+            nextTrack();
+        }
+    }
+
+    private void createPlayer() {
+        mediaPlayer = new MediaPlayer();
+        setPlayerAudioAttributes();
+        mediaPlayer.setOnPreparedListener(player -> {
+            prepared = true;
+            updateMetadata();
+            startPlayback();
+        });
+        mediaPlayer.setOnCompletionListener(player -> {
+            updatePlaybackState(PlaybackStateCompat.STATE_STOPPED);
+            nextTrack();
+        });
+        mediaPlayer.setOnErrorListener((player, what, extra) -> {
+            prepared = false;
+            updatePlaybackState(PlaybackStateCompat.STATE_ERROR);
+            notifyPlayingState(false);
+            Log.e(TAG, "MediaPlayer error: what=" + what + ", extra=" + extra);
+            return true;
+        });
+    }
+
+    private void setPlayerAudioAttributes() {
+        mediaPlayer.setAudioAttributes(new AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                .build());
+    }
+
+    private void createMediaSession() {
+        mediaSession = new MediaSessionCompat(this, TAG);
+        mediaSession.setFlags(MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS
+                | MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS);
+        mediaSession.setCallback(new MediaSessionCompat.Callback() {
+            @Override
+            public void onPlay() {
+                playOrRequestDefault();
+            }
+
+            @Override
+            public void onPause() {
+                pausePlayback(true);
+            }
+
+            @Override
+            public void onSkipToNext() {
+                nextTrack();
+            }
+
+            @Override
+            public void onSkipToPrevious() {
+                previousTrack();
+            }
+
+            @Override
+            public void onSeekTo(long pos) {
+                seekTo((int) pos);
+            }
+        });
+        mediaSession.setActive(true);
+        updatePlaybackState(PlaybackStateCompat.STATE_NONE);
+    }
+
+    private void playMusic(String source) {
+        if (TextUtils.isEmpty(source)) {
+            updatePlaybackState(PlaybackStateCompat.STATE_ERROR);
+            return;
+        }
+        try {
+            prepared = false;
+            if (mediaPlayer.isPlaying()) {
+                mediaPlayer.stop();
+            }
+            mediaPlayer.reset();
+            setPlayerAudioAttributes();
+            if (source.startsWith("content://")) {
+                mediaPlayer.setDataSource(this, Uri.parse(source));
+            } else {
+                mediaPlayer.setDataSource(source);
+            }
+            mediaPlayer.setLooping(false);
+            updateMetadata();
+            updatePlaybackState(PlaybackStateCompat.STATE_BUFFERING);
+            mediaPlayer.prepareAsync();
+        } catch (IOException | IllegalArgumentException | IllegalStateException error) {
+            prepared = false;
+            updatePlaybackState(PlaybackStateCompat.STATE_ERROR);
+            notifyPlayingState(false);
+            Log.e(TAG, "Unable to play " + source, error);
+        }
+    }
+
+    private void startPlayback() {
+        if (!prepared || !requestAudioFocus()) {
+            return;
+        }
+        try {
+            mediaPlayer.start();
+            updatePlaybackState(PlaybackStateCompat.STATE_PLAYING);
+            notifyPlayingState(true);
+        } catch (IllegalStateException error) {
+            Log.e(TAG, "Unable to resume playback", error);
+        }
+    }
+
+    private void playOrRequestDefault() {
+        if (prepared) {
+            startPlayback();
+        } else if (activityCall != null) {
+            try {
+                activityCall.defaultPlay();
+            } catch (RemoteException error) {
+                Log.e(TAG, "Unable to request default track", error);
+            }
+        }
+    }
+
+    private void pausePlayback(boolean notifyActivity) {
+        if (isPlaying()) {
+            mediaPlayer.pause();
+        }
+        updatePlaybackState(PlaybackStateCompat.STATE_PAUSED);
+        if (notifyActivity) {
+            notifyPlayingState(false);
+        }
+    }
+
+    private boolean requestAudioFocus() {
+        if (audioManager == null) {
+            return true;
+        }
+        int result;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (audioFocusRequest == null) {
+                audioFocusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                        .setAudioAttributes(new AudioAttributes.Builder()
+                                .setUsage(AudioAttributes.USAGE_MEDIA)
+                                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                                .build())
+                        .setOnAudioFocusChangeListener(focusChangeListener, mainHandler)
+                        .build();
+            }
+            result = audioManager.requestAudioFocus(audioFocusRequest);
+        } else {
+            //noinspection deprecation
+            result = audioManager.requestAudioFocus(focusChangeListener,
+                    AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
+        }
+        return result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
+    }
+
+    private void abandonAudioFocus() {
+        if (audioManager == null) {
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && audioFocusRequest != null) {
+            audioManager.abandonAudioFocusRequest(audioFocusRequest);
+        } else {
+            //noinspection deprecation
+            audioManager.abandonAudioFocus(focusChangeListener);
+        }
+    }
+
+    private void openLocalTrack(int position) {
+        if (music == null || music.isEmpty()) {
+            return;
+        }
+        int normalized = (position % music.size() + music.size()) % music.size();
+        currentPosition = normalized;
+        currentMusic = music.get(normalized);
+        isLocal = true;
+        currentTrackName = safeText(currentMusic.getSong(), getString(R.string.unknown_music));
+        currentTrackArtist = safeText(currentMusic.getSinger(), getString(R.string.unknown_singer));
+        notifyTrackChanged();
+        playMusic(currentMusic.getPath());
+    }
+
+    private void nextTrack() {
+        if (isLocal && music != null && !music.isEmpty()) {
+            openLocalTrack(currentPosition + 1);
+        } else if (activityCall != null) {
+            try {
+                activityCall.next();
+            } catch (RemoteException error) {
+                Log.e(TAG, "Unable to request next track", error);
+            }
+        }
+    }
+
+    private void previousTrack() {
+        if (isLocal && music != null && !music.isEmpty()) {
+            openLocalTrack(currentPosition - 1);
+        } else if (activityCall != null) {
+            try {
+                activityCall.pre();
+            } catch (RemoteException error) {
+                Log.e(TAG, "Unable to request previous track", error);
+            }
+        }
+    }
+
+    private void seekTo(int position) {
+        if (prepared && mediaPlayer != null) {
+            mediaPlayer.seekTo(Math.max(0, position));
+            updatePlaybackState(isPlaying()
+                    ? PlaybackStateCompat.STATE_PLAYING : PlaybackStateCompat.STATE_PAUSED);
+        }
+    }
+
+    private boolean isPlaying() {
+        try {
+            return prepared && mediaPlayer != null && mediaPlayer.isPlaying();
+        } catch (IllegalStateException ignored) {
+            return false;
+        }
+    }
+
+    private long currentPlaybackPosition() {
+        try {
+            return prepared && mediaPlayer != null ? mediaPlayer.getCurrentPosition() : 0;
+        } catch (IllegalStateException ignored) {
+            return 0;
+        }
+    }
+
+    private long currentDuration() {
+        try {
+            return prepared && mediaPlayer != null ? mediaPlayer.getDuration() : 0;
+        } catch (IllegalStateException ignored) {
+            return 0;
+        }
+    }
+
+    private void notifyPlayingState(boolean playing) {
+        if (activityCall != null) {
+            try {
+                activityCall.call(playing);
+            } catch (RemoteException error) {
+                Log.e(TAG, "Unable to notify playback state", error);
+            }
+        }
+    }
+
+    private void notifyTrackChanged() {
+        if (activityCall != null) {
+            try {
+                activityCall.trackChanged(currentTrackName, currentTrackArtist, isLocal);
+            } catch (RemoteException error) {
+                Log.e(TAG, "Unable to notify track change", error);
+            }
+        }
+    }
+
+    private void updateMetadata() {
+        mediaSession.setMetadata(new MediaMetadataCompat.Builder()
+                .putString(MediaMetadataCompat.METADATA_KEY_TITLE, currentTrackName)
+                .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, currentTrackArtist)
+                .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, currentDuration())
+                .build());
+        updateNotification();
+    }
+
+    private void updatePlaybackState(int state) {
+        long actions = PlaybackStateCompat.ACTION_PLAY
+                | PlaybackStateCompat.ACTION_PAUSE
+                | PlaybackStateCompat.ACTION_PLAY_PAUSE
+                | PlaybackStateCompat.ACTION_SKIP_TO_NEXT
+                | PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
+                | PlaybackStateCompat.ACTION_SEEK_TO;
+        mediaSession.setPlaybackState(new PlaybackStateCompat.Builder()
+                .setActions(actions)
+                .setState(state, currentPlaybackPosition(),
+                        state == PlaybackStateCompat.STATE_PLAYING ? 1f : 0f)
+                .build());
+        updateNotification();
+    }
+
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(CHANNEL_ID,
+                    getString(R.string.playback_notification_channel),
+                    NotificationManager.IMPORTANCE_LOW);
+            channel.setDescription(getString(R.string.playback_notification_channel_description));
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) {
+                manager.createNotificationChannel(channel);
+            }
+        }
+    }
+
+    private Notification buildNotification() {
+        boolean playing = isPlaying();
+        PendingIntent contentIntent = PendingIntent.getActivity(this, 0,
+                new Intent(this, MainActivity.class), pendingIntentFlags());
+        return new NotificationCompat.Builder(this, CHANNEL_ID)
+                .setSmallIcon(R.drawable.peak_music_logo)
+                .setContentTitle(currentTrackName)
+                .setContentText(TextUtils.isEmpty(currentTrackArtist)
+                        ? getString(R.string.playback_ready) : currentTrackArtist)
+                .setContentIntent(contentIntent)
+                .setOnlyAlertOnce(true)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setOngoing(playing)
+                .addAction(android.R.drawable.ic_media_previous,
+                        getString(R.string.previous_track), actionIntent(ACTION_PREVIOUS, 1))
+                .addAction(playing ? android.R.drawable.ic_media_pause
+                                : android.R.drawable.ic_media_play,
+                        playing ? getString(R.string.pause) : getString(R.string.play),
+                        actionIntent(ACTION_TOGGLE, 2))
+                .addAction(android.R.drawable.ic_media_next,
+                        getString(R.string.next_track), actionIntent(ACTION_NEXT, 3))
+                .setStyle(new MediaStyle()
+                        .setMediaSession(mediaSession.getSessionToken())
+                        .setShowActionsInCompactView(0, 1, 2))
+                .build();
+    }
+
+    private PendingIntent actionIntent(String action, int requestCode) {
+        Intent intent = new Intent(this, MusicService.class).setAction(action);
+        return PendingIntent.getService(this, requestCode, intent, pendingIntentFlags());
+    }
+
+    private int pendingIntentFlags() {
+        return PendingIntent.FLAG_UPDATE_CURRENT
+                | (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                ? PendingIntent.FLAG_IMMUTABLE : 0);
+    }
+
+    private void updateNotification() {
+        NotificationManager manager =
+                (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (manager != null && mediaSession != null) {
+            manager.notify(NOTIFICATION_ID, buildNotification());
+        }
+    }
+
+    private void registerNoisyReceiver() {
+        IntentFilter filter = new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(noisyReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            //noinspection UnspecifiedRegisterReceiverFlag
+            registerReceiver(noisyReceiver, filter);
+        }
+    }
+
+    private static String safeText(String value, String fallback) {
+        return TextUtils.isEmpty(value) || "<unknown>".equals(value) ? fallback : value;
     }
 
     @Nullable
     @Override
     public IBinder onBind(Intent intent) {
-        LogUtils.showTagE("服务绑定");
         return stub;
     }
 
     @Override
     public boolean onUnbind(Intent intent) {
-        LogUtils.showTagE("服务解除绑定");
+        activityCall = null;
         return true;
     }
 
     @Override
     public void onDestroy() {
-        stopTrackingPosition();
-        audioWidget.controller().onControlsClickListener(null);
-        audioWidget.controller().onWidgetStateChangedListener(null);
-        audioWidget.hide();
-        audioWidget = null;
+        mainHandler.removeCallbacksAndMessages(null);
+        unregisterReceiver(noisyReceiver);
+        abandonAudioFocus();
         if (mediaPlayer != null) {
-            if (mediaPlayer.isPlaying()) {
-                mediaPlayer.stop();
-            }
             mediaPlayer.reset();
             mediaPlayer.release();
             mediaPlayer = null;
         }
-        stopTrackingPosition();
+        if (mediaSession != null) {
+            mediaSession.setActive(false);
+            mediaSession.release();
+            mediaSession = null;
+        }
+        stopForeground(true);
         super.onDestroy();
-        LogUtils.showTagE("服务销毁");
     }
 
-    /**
-     * 播放音乐的方法
-     *
-     * @param currentPath 音乐文件路径
-     */
-    private void playMusic(String currentPath) {
-        //currentPath = "http://data.apiopen.top/%E8%A2%81%E7%BB%B4%E5%A8%85-%E8%AF%B4%E6%95%A3%E5%B0%B1%E6%95%A3.mp3";
-        try {
-            if (mediaPlayer == null) {
-                mediaPlayer = new MediaPlayer();
-                mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
-                mediaPlayer.setOnErrorListener((mp, what, extra) -> {
-                    isPlaying = false;
-                    //audioWidget.controller().stop();
-                    return false;
-                });
-                mediaPlayer.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
-                    @Override
-                    public void onPrepared(MediaPlayer mediaPlayer) {
-                        isPlaying = true;
-                        if (activityCall != null) {
-                            try {
-                                activityCall.call(isPlaying);
-                            } catch (RemoteException e) {
-                                e.printStackTrace();
-                            }
-                        }
-                        mediaPlayer.start();
-                        //audioWidget.controller().start();
-                        audioWidget.controller().duration(mediaPlayer.getDuration());
-                    }
-                });
-                mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
-                    @Override
-                    public void onCompletion(MediaPlayer mp) {
-                        try {
-                            stub.next();
-                        } catch (RemoteException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                });
-            }
-            if (mediaPlayer.isPlaying()) {//如果当前正在播放音乐，则先停止
-                mediaPlayer.stop();
-            }
-            mediaPlayer.reset();//重置播放器z状态
-            if (currentPath.startsWith("content://")) {
-                mediaPlayer.setDataSource(this, Uri.parse(currentPath));
-            } else {
-                mediaPlayer.setDataSource(currentPath);
-            }
-            mediaPlayer.setLooping(false);//设置为循环播放
-            //mediaPlayer.prepare();//初始化播放器MediaPlayer
-            mediaPlayer.prepareAsync();//异步初始化播放器MediaPlayer
-            isPlaying = true;
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-    }
-
-    public void traverseFolder(File file) {
-        File[] listFiles = file.listFiles();
-        for (int i = 0; listFiles != null && i < listFiles.length; i++) {
-            if (listFiles[i].isDirectory()) {//目录
-                traverseFolder(listFiles[i]);
-            } else {
-                if (listFiles[i].getName().endsWith(".mp3")) {
-                    LogUtils.showTagE(listFiles[i].getPath());
-                }
-            }
-        }
-    }
-
-    private void startTrackingPosition() {
-        stopTrackingPosition();
-        timer = new Timer(TAG);
-        timer.scheduleAtFixedRate(new TimerTask() {
-            @Override
-            public void run() {
-                AudioWidget widget = audioWidget;
-                MediaPlayer player = mediaPlayer;
-                if (mediaPlayer != null && mediaPlayer.isPlaying() && widget != null) {
-                    widget.controller().position(player.getCurrentPosition());
-                }
-            }
-        }, UPDATE_INTERVAL, UPDATE_INTERVAL);
-    }
-
-    private void stopTrackingPosition() {
-        if (timer == null)
-            return;
-        timer.cancel();
-        timer.purge();
-        timer = null;
-    }
-
-    private MusicAidlInterface.Stub stub = new MusicAidlInterface.Stub() {
-
+    private final MusicAidlInterface.Stub stub = new MusicAidlInterface.Stub() {
         @Override
-        public void openAudio(int position) throws RemoteException {
-            isLocal = true;
-            currentMusic = music.get(position);
-            currentPosition = position;
-            playMusic(music.get(position).getPath()/*"/storage/emulated/0/Download/What are words.mp3"*/);
+        public void openAudio(int position) {
+            openLocalTrack(position);
         }
 
         @Override
-        public void playAudio(String url) throws RemoteException {
+        public void playAudio(String url, String name, String artist) {
             isLocal = false;
-            musicList = MusicDataUtils.getInstance().getMusicList();
-            if (musicList != null) {
-                for (int i = 0; i < musicList.size(); i++) {
-                    if (musicList.get(i).getMp3().equals(url)) {
-                        currentPosition = i;
-                        break;
-                    }
-                }
-            }
+            currentMusic = null;
+            currentTrackName = safeText(name, getString(R.string.unknown_music));
+            currentTrackArtist = safeText(artist, getString(R.string.unknown_singer));
+            notifyTrackChanged();
             playMusic(url);
         }
 
         @Override
-        public void play() throws RemoteException {
-            if (mediaPlayer != null/* && currentMusic != null*/) {
-                mediaPlayer.start();
-                isPlaying = true;
-            } else if (mediaPlayer == null) {
-                // openAudio(0);
-                if (activityCall != null) {
-                    activityCall.defaultPlay();//直接点击播放按钮，触发默认歌曲。
-                }
-            }
-            //悬浮按钮点击播放触发此方法，同步状态到外部UI。
-            if (activityCall != null) {
-                activityCall.call(isPlaying);
-            }
+        public void play() {
+            playOrRequestDefault();
         }
 
         @Override
-        public void pause() throws RemoteException {
-            if (mediaPlayer != null) {
-                mediaPlayer.pause();
-                isPlaying = false;
-            }
-            //悬浮按钮点击暂停触发此方法，同步状态到外部UI。
-            if (activityCall != null) {
-                activityCall.call(isPlaying);
-            }
-        }
-
-        /**
-         * 反射设置控件当前状态
-         * @param state
-         */
-        void setPlayState(int state) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                try {
-                    //    static final int STATE_STOPPED = 0;
-                    //    static final int STATE_PLAYING = 1;
-                    //    static final int STATE_PAUSED = 2;
-                    Field playbackState = audioWidget.getClass().getDeclaredField("playbackState");
-                    playbackState.setAccessible(true);
-                    Class<?> aClass = Class.forName("com.cleveroad.audiowidget.PlaybackState");
-                    Field state1 = aClass.getDeclaredField("state");
-                    state1.setAccessible(true);
-                    state1.set(playbackState.get(audioWidget), state);
-                    state1.setAccessible(false);
-                    playbackState.setAccessible(false);
-                } catch (NoSuchFieldException | IllegalAccessException | ClassNotFoundException e) {
-                    e.printStackTrace();
-                }
-            }
+        public void pause() {
+            pausePlayback(true);
         }
 
         @Override
-        public String getMusicName() throws RemoteException {
-            return currentMusic.getSong();
+        public String getMusicName() {
+            return currentTrackName;
         }
 
         @Override
-        public boolean isPlay() throws RemoteException {
-            return mediaPlayer != null && mediaPlayer.isPlaying();//isPlaying;
+        public boolean isPlay() {
+            return isPlaying();
         }
 
         @Override
-        public long getDuration() throws RemoteException {
-            return mediaPlayer.getDuration();
+        public long getDuration() {
+            return currentDuration();
         }
 
         @Override
-        public int getCurrentIndex() throws RemoteException {
+        public int getCurrentIndex() {
             return currentPosition;
         }
 
         @Override
-        public int getCurrentPosition() throws RemoteException {
-            return mediaPlayer == null ? 0 : mediaPlayer.getCurrentPosition();
+        public int getCurrentPosition() {
+            return (int) currentPlaybackPosition();
         }
 
         @Override
-        public void seekTo(int position) throws RemoteException {
-            mediaPlayer.seekTo(position);
+        public void seekTo(int position) {
+            MusicService.this.seekTo(position);
         }
 
         @Override
-        public void seekPlayMode(int mode) throws RemoteException {
-
+        public void seekPlayMode(int mode) {
+            // Play modes are introduced in the queue persistence phase.
         }
 
         @Override
-        public void pre() throws RemoteException {
-            if (activityCall != null) {
-                activityCall.pre();
-            }
-//            if (isLocal) {//本地音乐
-//                if (music != null && music.size() > 0) {
-//                    currentPosition--;
-//                    if (currentPosition >= 0) {
-//                        openAudio(currentPosition);
-//                    } else {
-//                        openAudio(music.size() - 1);
-//                    }
-//                } else {
-//                    ToastUtils.showToast("没有更多歌曲了~");
-//                }
-//            } else {//线上音乐
-//                musicList = MusicDataUtils.getInstance().getMusicList();
-//                if (musicList != null && musicList.size() > 0) {
-//                    currentPosition--;
-//                    if (currentPosition >= 0) {
-//                        playAudio(musicList.get(currentPosition).getMp3());
-//                    } else {
-//                        playAudio(musicList.get(musicList.size() - 1).getMp3());
-//                    }
-//                } else {
-//                    ToastUtils.showToast("没有更多歌曲了~");
-//                }
-//            }
+        public void pre() {
+            previousTrack();
         }
 
         @Override
-        public void next() throws RemoteException {
-            if (activityCall != null) {
-                activityCall.next();
-            }
-//            if (isLocal) {
-//                if (music != null && music.size() > 0) {
-//                    currentPosition++;
-//                    if (currentPosition <= music.size() - 1) {
-//                        openAudio(currentPosition);
-//                    } else {
-//                        openAudio(0);
-//                    }
-//                } else {
-//                    ToastUtils.showToast("没有更多歌曲了~");
-//                }
-//            } else {
-//                musicList = MusicDataUtils.getInstance().getMusicList();
-//                if (musicList != null && musicList.size() > 0) {
-//                    currentPosition++;
-//                    if (currentPosition <= musicList.size() - 1) {
-//                        playAudio(musicList.get(currentPosition).getMp3());
-//                    } else {
-//                        playAudio(musicList.get(0).getMp3());
-//                    }
-//                } else {
-//                    ToastUtils.showToast("没有更多歌曲了~");
-//                }
-//            }
+        public void next() {
+            nextTrack();
         }
 
         @Override
-        public void show() throws RemoteException {
-            mHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    audioWidget.show(SPUtils.getPrefInt(SPUtils.SUSPENSIONX, ScreenUtils.getScreenWidth()), SPUtils.getPrefInt(SPUtils.SUSPENSIONY, ScreenUtils.getScreenHeight() / 2));
-                }
-            });
+        public void registerCallback(ActivityCall call) {
+            activityCall = call;
+            notifyTrackChanged();
+            notifyPlayingState(isPlaying());
         }
 
-        @Override
-        public void hide() throws RemoteException {
-            mHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    audioWidget.collapse();
-                    audioWidget.hide();
-                }
-            });
-        }
-
-        @Override
-        public void registerCallback(ActivityCall call) throws RemoteException {
-            MusicService.this.activityCall = call;
-        }
-
-        /**
-         *点击外部按钮控制播放状态时，对悬浮按钮状态进行同步。
-         */
-        @Override
-        public void clickButton(boolean isPlay) throws RemoteException {
-            if (isPlay) {
-                audioWidget.controller().start();
-            } else {
-                audioWidget.controller().pause();
-            }
-        }
-/**
- * 通过反射调用PlayPauseButton的onClick方法
- */
-//        @RequiresApi(api = Build.VERSION_CODES.KITKAT)
-//        @Override
-//        public void clickButton() throws RemoteException {
-//            try {
-//                Field playPauseButton = audioWidget.getClass().getDeclaredField("playPauseButton");
-//                playPauseButton.setAccessible(true);
-//                Class<?> aClass = Class.forName("com.cleveroad.audiowidget.PlayPauseButton");
-//                Method method = aClass.getDeclaredMethod("onClick");
-//                method.invoke(playPauseButton.get(audioWidget));
-//                playPauseButton.setAccessible(false);
-//            } catch (NoSuchFieldException | ClassNotFoundException | NoSuchMethodException e) {
-//                e.printStackTrace();
-//            } catch (IllegalAccessException e) {
-//                e.printStackTrace();
-//            } catch (InvocationTargetException e) {
-//                e.printStackTrace();
-//            }
-//        }
     };
-
-    @Override
-    public void onWidgetStateChanged(@NonNull AudioWidget.State state) {
-        LogUtils.showTagE(state);
-    }
-
-    @Override
-    public void onWidgetPositionChanged(int cx, int cy) {
-        SPUtils.setPrefInt(SPUtils.SUSPENSIONX, cx);
-        SPUtils.setPrefInt(SPUtils.SUSPENSIONY, cy);
-    }
 }

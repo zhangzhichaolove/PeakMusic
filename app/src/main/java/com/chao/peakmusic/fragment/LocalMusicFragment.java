@@ -4,6 +4,7 @@ import android.os.Bundle;
 import android.text.format.DateUtils;
 import android.text.format.Formatter;
 import android.widget.TextView;
+import android.view.View;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -26,6 +27,7 @@ import java.util.ArrayList;
 
 public class LocalMusicFragment extends BaseFragment {
     RecyclerView musicList;
+    TextView emptyView;
     private LocalMusicAdapter adapter;
     private PlayMusicListener listener;
     private ArrayList<SongModel> music;
@@ -46,12 +48,14 @@ public class LocalMusicFragment extends BaseFragment {
     @Override
     public void initView() {
         musicList = rootView.findViewById(R.id.local_music_list);
+        emptyView = rootView.findViewById(R.id.local_empty);
         musicList.setLayoutManager(new LinearLayoutManager(mContext));
         musicList.setAdapter(adapter = new LocalMusicAdapter());
         music = music == null ? ScanningUtils.getInstance(mContext).getMusic() : music;
         if (music != null) {
             adapter.setData(music);
         }
+        updateEmptyState();
         listener = ((MainActivity) getActivity()).getListener();
     }
 
@@ -98,5 +102,15 @@ public class LocalMusicFragment extends BaseFragment {
         if (adapter != null && music != null) {
             adapter.setData(music);
         }
+        updateEmptyState();
+    }
+
+    private void updateEmptyState() {
+        if (emptyView == null || musicList == null) {
+            return;
+        }
+        boolean empty = music == null || music.isEmpty();
+        emptyView.setVisibility(empty ? View.VISIBLE : View.GONE);
+        musicList.setVisibility(empty ? View.GONE : View.VISIBLE);
     }
 }

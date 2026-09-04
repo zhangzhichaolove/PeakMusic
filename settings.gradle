@@ -16,4 +16,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = 'PeakMusic'
-include ':app', ':audiowidget'
+include ':app'
