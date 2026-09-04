@@ -7,7 +7,8 @@
     android:minHeight="?attr/actionBarSize"
     app:contentInsetLeft="0dp"
     app:contentInsetStart="0dp"
-    tools:background="#f00">
+    tools:background="#f00"
+    tools:ignore="RelativeOverlap">
 
     <ImageView
         android:id="@+id/toolbar_ivb_left"

@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<network-security-config>
+<network-security-config xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="InsecureBaseConfiguration">
+    <!-- User-configurable local media APIs may require HTTP transport. -->
     <base-config cleartextTrafficPermitted="true" />
 </network-security-config>

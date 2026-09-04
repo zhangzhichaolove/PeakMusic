@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!-- Legacy artwork is intentionally supplied at xxhdpi; Android scales it for other densities. -->
+    <issue id="IconMissingDensityFolder" severity="ignore" />
+</lint>
