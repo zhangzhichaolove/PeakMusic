@@ -69,7 +69,6 @@ public class OnLineMusicFragment extends BaseFragment {
         contentMusicAdapter.setListener(new OnlineContentMusicAdapter.onItemClick() {
             @Override
             public void itemClickListener(int position) {
-                //playMusicWithId(contentMusicAdapter.getData().get(position).getSongid());
                 MusicModel musicModel = contentMusicAdapter.getData().get(position);
                 MainActivity activity = (MainActivity) getActivity();
                 if (activity != null) {
@@ -171,31 +170,4 @@ public class OnLineMusicFragment extends BaseFragment {
         musicContent.setVisibility(View.GONE);
     }
 
-    private void playMusicWithId(int id) {
-//        ApiRequest.obtain(ServiceFactory.getInstance().createService(ApiUrl.class).getMusicDetails(id), new Observer<HttpResult<MusicDetailsResultModel>>() {
-//            @Override
-//            public void onSubscribe(Disposable d) {
-//                disposables.add(d);
-//            }
-//
-//            @Override
-//            public void onNext(HttpResult<MusicDetailsResultModel> objectHttpResult) {
-//                LogUtils.showTagE(objectHttpResult.getResult().getSongList().get(0).getSongLink());
-//                ((MainActivity) getActivity()).getListener().playMusic(objectHttpResult.getResult().getSongList().get(0).getSongLink(),
-//                        objectHttpResult.getResult().getSongList().get(0).getSongName(), objectHttpResult.getResult().getSongList().get(0).getArtistName(),
-//                        objectHttpResult.getResult().getSongList().get(0).getSongPicBig());
-//            }
-//
-//            @Override
-//            public void onError(Throwable e) {
-//                LogUtils.showTagE(e);
-//                ToastUtils.showToast("此歌曲飞走了~");
-//            }
-//
-//            @Override
-//            public void onComplete() {
-//
-//            }
-//        });
-    }
 }

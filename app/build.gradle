@@ -24,6 +24,7 @@ android {
     buildFeatures {
         aidl = true
         buildConfig = true
+        viewBinding = true
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

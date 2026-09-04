@@ -1,5 +1,6 @@
 package com.chao.peakmusic.utils;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.DownloadManager;
 import android.content.ClipData;
@@ -7,11 +8,15 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Environment;
+import android.content.pm.PackageManager;
 import android.text.TextUtils;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AlertDialog;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 import com.chao.peakmusic.R;
 import com.chao.peakmusic.data.MusicLibraryRepository;
@@ -22,6 +27,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class MusicActions {
+    private static final int REQUEST_WRITE_MUSIC = 7101;
+
     private MusicActions() {
     }
 
@@ -143,6 +150,15 @@ public final class MusicActions {
     }
 
     private static void download(Activity activity, MusicTrackEntity track) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                && Build.VERSION.SDK_INT <= Build.VERSION_CODES.P
+                && ContextCompat.checkSelfPermission(activity,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(activity,
+                    new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_WRITE_MUSIC);
+            ToastUtils.showToast(activity.getString(R.string.download_permission_required));
+            return;
+        }
         try {
             String fileName = sanitize(track.name + "-" + track.artist) + ".mp3";
             DownloadManager.Request request = new DownloadManager.Request(Uri.parse(track.source))

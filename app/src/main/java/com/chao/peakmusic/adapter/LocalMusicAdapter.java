@@ -1,95 +1,101 @@
 package com.chao.peakmusic.adapter;
 
-import android.view.LayoutInflater;
-import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.DiffUtil;
+import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.chao.peakmusic.R;
+import com.chao.peakmusic.databinding.ItemMusicBinding;
 import com.chao.peakmusic.model.SongModel;
 import com.chao.peakmusic.utils.ImageLoaderV4;
 import com.chao.peakmusic.utils.ScanningUtils;
 
 import java.util.ArrayList;
+import java.util.Objects;
 
 /**
  * Created by Chao on 2017-12-18.
  */
 
-public class LocalMusicAdapter extends RecyclerView.Adapter<LocalMusicAdapter.Holder> {
+public class LocalMusicAdapter extends ListAdapter<SongModel, LocalMusicAdapter.Holder> {
 
     private onItemClick itemClick;
-    private ArrayList<SongModel> data;
 
-    @Override
-    public LocalMusicAdapter.Holder onCreateViewHolder(ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_music, parent, false);
-        return new Holder(view);
-    }
-
-    @Override
-    public void onBindViewHolder(LocalMusicAdapter.Holder holder, int position) {
-        holder.tv_title.setText(data.get(position).getSong());
-        holder.tv_artist.setText("<unknown>".equals(data.get(position).getSinger())
-                ? data.get(position).getAlbum() : data.get(position).getSinger());
-        Object cover = data.get(position).getAlbumId() > 0
-                ? ScanningUtils.getInstance(holder.itemView.getContext())
-                .getMediaStoreAlbumCoverUri(data.get(position).getAlbumId())
-                : R.drawable.default_cover;
-        ImageLoaderV4.getInstance().load(holder.itemView.getContext(), holder.iv_cover, cover);
-        holder.itemView.setOnClickListener(new View.OnClickListener() {
+    public LocalMusicAdapter() {
+        super(new DiffUtil.ItemCallback<SongModel>() {
             @Override
-            public void onClick(View view) {
-                int adapterPosition = holder.getBindingAdapterPosition();
-                if (itemClick != null && adapterPosition != RecyclerView.NO_POSITION) {
-                    itemClick.itemClickListener(adapterPosition);
-                }
+            public boolean areItemsTheSame(@NonNull SongModel oldItem,
+                                           @NonNull SongModel newItem) {
+                return Objects.equals(oldItem.getPath(), newItem.getPath());
+            }
+
+            @Override
+            public boolean areContentsTheSame(@NonNull SongModel oldItem,
+                                              @NonNull SongModel newItem) {
+                return Objects.equals(oldItem.getSong(), newItem.getSong())
+                        && Objects.equals(oldItem.getSinger(), newItem.getSinger())
+                        && Objects.equals(oldItem.getAlbum(), newItem.getAlbum())
+                        && oldItem.getAlbumId() == newItem.getAlbumId();
             }
         });
-        holder.itemView.setOnLongClickListener(view -> {
-            int adapterPosition = holder.getBindingAdapterPosition();
-            if (itemClick != null && adapterPosition != RecyclerView.NO_POSITION) {
-                itemClick.itemLongClickListener(adapterPosition);
-            }
-            return true;
-        });
-        //ImageLoaderV4.getInstance().load(holder.itemView.getContext(), holder.iv_cover, Uri.parse("content://media/external/audio/media/" + data.get(position).getAlbumId() + "/albumart"));
+    }
+
+    @NonNull
+    @Override
+    public Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        return new Holder(ItemMusicBinding.inflate(
+                android.view.LayoutInflater.from(parent.getContext()), parent, false));
     }
 
     @Override
-    public int getItemCount() {
-        return data == null ? 0 : data.size();
+    public void onBindViewHolder(@NonNull Holder holder, int position) {
+        SongModel song = getItem(position);
+        holder.title.setText(song.getSong());
+        holder.artist.setText("<unknown>".equals(song.getSinger())
+                ? song.getAlbum() : song.getSinger());
+        Object cover = song.getAlbumId() > 0
+                ? ScanningUtils.getInstance(holder.itemView.getContext())
+                .getMediaStoreAlbumCoverUri(song.getAlbumId())
+                : R.drawable.default_cover;
+        ImageLoaderV4.getInstance().load(holder.itemView.getContext(), holder.cover, cover);
     }
 
     public void setData(ArrayList<SongModel> data) {
-        int previousCount = getItemCount();
-        this.data = null;
-        if (previousCount > 0) {
-            notifyItemRangeRemoved(0, previousCount);
-        }
-        this.data = data;
-        if (getItemCount() > 0) {
-            notifyItemRangeInserted(0, getItemCount());
-        }
+        submitList(data == null ? new ArrayList<>() : new ArrayList<>(data));
     }
 
     public void setListener(onItemClick itemClick) {
         this.itemClick = itemClick;
     }
 
-    public class Holder extends RecyclerView.ViewHolder {
-        public TextView tv_title;
-        public TextView tv_artist;
-        public ImageView iv_cover;
+    public final class Holder extends RecyclerView.ViewHolder {
+        final TextView title;
+        final TextView artist;
+        final ImageView cover;
 
-        public Holder(View itemView) {
-            super(itemView);
-            tv_title = itemView.findViewById(R.id.tv_title);
-            tv_artist = itemView.findViewById(R.id.tv_artist);
-            iv_cover = itemView.findViewById(R.id.iv_cover);
+        Holder(ItemMusicBinding binding) {
+            super(binding.getRoot());
+            title = binding.tvTitle;
+            artist = binding.tvArtist;
+            cover = binding.ivCover;
+            itemView.setOnClickListener(view -> {
+                int position = getBindingAdapterPosition();
+                if (itemClick != null && position != RecyclerView.NO_POSITION) {
+                    itemClick.itemClickListener(position);
+                }
+            });
+            itemView.setOnLongClickListener(view -> {
+                int position = getBindingAdapterPosition();
+                if (itemClick != null && position != RecyclerView.NO_POSITION) {
+                    itemClick.itemLongClickListener(position);
+                }
+                return true;
+            });
         }
     }
 

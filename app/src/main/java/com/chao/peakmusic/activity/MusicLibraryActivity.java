@@ -3,7 +3,6 @@ package com.chao.peakmusic.activity;
 import android.content.Context;
 import android.content.Intent;
 import android.text.InputType;
-import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -17,7 +16,9 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.content.ContextCompat;
+import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.chao.peakmusic.R;
@@ -25,6 +26,7 @@ import com.chao.peakmusic.adapter.MusicLibraryAdapter;
 import com.chao.peakmusic.data.MusicLibraryRepository;
 import com.chao.peakmusic.data.MusicTrackEntity;
 import com.chao.peakmusic.data.PlaylistSummary;
+import com.chao.peakmusic.databinding.ItemPlaylistBinding;
 import com.chao.peakmusic.service.MusicService;
 import com.chao.peakmusic.utils.MusicActions;
 import com.chao.peakmusic.utils.ToastUtils;
@@ -241,49 +243,56 @@ public class MusicLibraryActivity extends AppCompatActivity {
         menu.findItem(R.id.action_delete_playlist).setVisible(selectedPlaylistId >= 0);
     }
 
-    private final class PlaylistAdapter extends RecyclerView.Adapter<PlaylistAdapter.Holder> {
-        private final List<PlaylistSummary> items = new ArrayList<>();
+    private final class PlaylistAdapter extends ListAdapter<PlaylistSummary, PlaylistAdapter.Holder> {
+        PlaylistAdapter() {
+            super(new DiffUtil.ItemCallback<PlaylistSummary>() {
+                @Override
+                public boolean areItemsTheSame(@NonNull PlaylistSummary oldItem,
+                                               @NonNull PlaylistSummary newItem) {
+                    return oldItem.id == newItem.id;
+                }
+
+                @Override
+                public boolean areContentsTheSame(@NonNull PlaylistSummary oldItem,
+                                                  @NonNull PlaylistSummary newItem) {
+                    return oldItem.trackCount == newItem.trackCount
+                            && java.util.Objects.equals(oldItem.name, newItem.name);
+                }
+            });
+        }
 
         void setItems(List<PlaylistSummary> playlists) {
-            int previousCount = items.size();
-            items.clear();
-            if (previousCount > 0) {
-                notifyItemRangeRemoved(0, previousCount);
-            }
-            items.addAll(playlists);
-            if (!items.isEmpty()) {
-                notifyItemRangeInserted(0, items.size());
-            }
+            submitList(new ArrayList<>(playlists));
         }
 
         @NonNull
         @Override
         public Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            return new Holder(LayoutInflater.from(parent.getContext())
-                    .inflate(R.layout.item_playlist, parent, false));
+            return new Holder(ItemPlaylistBinding.inflate(
+                    android.view.LayoutInflater.from(parent.getContext()), parent, false));
         }
 
         @Override
         public void onBindViewHolder(@NonNull Holder holder, int position) {
-            PlaylistSummary playlist = items.get(position);
+            PlaylistSummary playlist = getItem(position);
             holder.name.setText(playlist.name);
             holder.count.setText(getString(R.string.playlist_track_count, playlist.trackCount));
-            holder.itemView.setOnClickListener(view -> openPlaylist(playlist));
-        }
-
-        @Override
-        public int getItemCount() {
-            return items.size();
         }
 
         final class Holder extends RecyclerView.ViewHolder {
             final TextView name;
             final TextView count;
 
-            Holder(View itemView) {
-                super(itemView);
-                name = itemView.findViewById(R.id.playlist_name);
-                count = itemView.findViewById(R.id.playlist_count);
+            Holder(ItemPlaylistBinding binding) {
+                super(binding.getRoot());
+                name = binding.playlistName;
+                count = binding.playlistCount;
+                itemView.setOnClickListener(view -> {
+                    int position = getBindingAdapterPosition();
+                    if (position != RecyclerView.NO_POSITION) {
+                        openPlaylist(getItem(position));
+                    }
+                });
             }
         }
     }

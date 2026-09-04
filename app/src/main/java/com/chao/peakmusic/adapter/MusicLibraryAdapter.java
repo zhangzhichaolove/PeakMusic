@@ -1,7 +1,5 @@
 package com.chao.peakmusic.adapter;
 
-import android.view.LayoutInflater;
-import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -13,6 +11,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.chao.peakmusic.R;
 import com.chao.peakmusic.data.MusicTrackEntity;
+import com.chao.peakmusic.databinding.ItemMusicBinding;
 import com.chao.peakmusic.utils.ImageLoaderV4;
 
 public class MusicLibraryAdapter extends ListAdapter<MusicTrackEntity, MusicLibraryAdapter.Holder> {
@@ -39,8 +38,8 @@ public class MusicLibraryAdapter extends ListAdapter<MusicTrackEntity, MusicLibr
     @NonNull
     @Override
     public Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        return new Holder(LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_music, parent, false));
+        return new Holder(ItemMusicBinding.inflate(
+                android.view.LayoutInflater.from(parent.getContext()), parent, false));
     }
 
     @Override
@@ -79,11 +78,11 @@ public class MusicLibraryAdapter extends ListAdapter<MusicTrackEntity, MusicLibr
         final TextView artist;
         final ImageView cover;
 
-        Holder(View itemView) {
-            super(itemView);
-            title = itemView.findViewById(R.id.tv_title);
-            artist = itemView.findViewById(R.id.tv_artist);
-            cover = itemView.findViewById(R.id.iv_cover);
+        Holder(ItemMusicBinding binding) {
+            super(binding.getRoot());
+            title = binding.tvTitle;
+            artist = binding.tvArtist;
+            cover = binding.ivCover;
         }
     }
 
