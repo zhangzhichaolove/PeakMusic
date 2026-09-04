@@ -1,6 +1,6 @@
 package com.chao.peakmusic.model;
 
-import com.chao.peakmusic.base.ApiUrl;
+import com.chao.peakmusic.base.ApiAddressManager;
 
 import java.io.Serializable;
 
@@ -79,7 +79,7 @@ public class MusicModel implements Serializable {
     }
 
     private String resolveUrl(String value) {
-        HttpUrl baseUrl = HttpUrl.parse(ApiUrl.BASE_URL);
+        HttpUrl baseUrl = HttpUrl.parse(ApiAddressManager.getBaseUrl());
         HttpUrl resolvedUrl = baseUrl == null || value == null ? null : baseUrl.resolve(value);
         return resolvedUrl == null ? value : resolvedUrl.toString();
     }

@@ -49,14 +49,18 @@ public class ServiceFactory {
      */
     public <S> S createService(Class<S> serviceClass) {
         String baseUrl = "";
-        try {
-            Field field1 = serviceClass.getField("BASE_URL");
-            baseUrl = (String) field1.get(serviceClass);
-        } catch (NoSuchFieldException e) {
-            e.printStackTrace();
-        } catch (IllegalAccessException e) {
-            e.getMessage();
-            e.printStackTrace();
+        if (serviceClass == ApiUrl.class) {
+            baseUrl = ApiAddressManager.getBaseUrl();
+        } else {
+            try {
+                Field field1 = serviceClass.getField("BASE_URL");
+                baseUrl = (String) field1.get(serviceClass);
+            } catch (NoSuchFieldException e) {
+                e.printStackTrace();
+            } catch (IllegalAccessException e) {
+                e.getMessage();
+                e.printStackTrace();
+            }
         }
         Retrofit retrofit = new Retrofit.Builder()
                 .baseUrl(baseUrl)

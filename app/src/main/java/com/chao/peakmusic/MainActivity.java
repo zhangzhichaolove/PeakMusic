@@ -14,11 +14,13 @@ import android.os.Looper;
 import android.os.RemoteException;
 import android.content.pm.PackageManager;
 import android.provider.Settings;
+import android.text.InputType;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.FrameLayout;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -26,6 +28,7 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.ActionBarDrawerToggle;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -37,6 +40,7 @@ import androidx.viewpager.widget.ViewPager;
 import com.chao.peakmusic.activity.MusicPlayActivity;
 import com.chao.peakmusic.adapter.HomePageAdapter;
 import com.chao.peakmusic.base.BaseActivity;
+import com.chao.peakmusic.base.ApiAddressManager;
 import com.chao.peakmusic.fragment.LocalMusicFragment;
 import com.chao.peakmusic.fragment.OnLineMusicFragment;
 import com.chao.peakmusic.listener.PlayMusicListener;
@@ -261,7 +265,36 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         if (mDrawerLayout.isDrawerOpen(GravityCompat.START)) {
             mDrawerLayout.closeDrawer(GravityCompat.START);
         }
+        if (item.getItemId() == R.id.action_api_address) {
+            showApiAddressDialog();
+            return true;
+        }
         return false;
+    }
+
+    private void showApiAddressDialog() {
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        input.setText(ApiAddressManager.getBaseUrl());
+        input.setSelection(input.length());
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.menu_api_address)
+                .setView(input)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.save, null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(view -> {
+                    if (!ApiAddressManager.saveBaseUrl(input.getText().toString())) {
+                        input.setError(getString(R.string.api_address_invalid));
+                        return;
+                    }
+                    dialog.dismiss();
+                    ToastUtils.showToast(getString(R.string.api_address_saved));
+                }));
+        dialog.show();
     }
 
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
