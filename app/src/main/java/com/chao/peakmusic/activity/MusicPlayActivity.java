@@ -17,6 +17,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.LinearInterpolator;
 import android.widget.TextView;
+import android.widget.Button;
+import android.widget.SeekBar;
 
 import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
@@ -29,14 +31,13 @@ import com.chao.peakmusic.base.BaseActivity;
 import com.chao.peakmusic.model.MusicModel;
 import com.chao.peakmusic.service.MusicService;
 import com.chao.peakmusic.utils.ImageLoaderV4;
+import com.chao.peakmusic.utils.LyricsParser;
+import com.chao.peakmusic.utils.LyricsParser.LyricLine;
 import com.chao.peakmusic.widget.MusicAlbumView;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -60,12 +61,19 @@ public class MusicPlayActivity extends BaseActivity {
     private RecyclerView lyricsList;
     private LinearLayoutManager lyricsLayoutManager;
     private LyricsAdapter lyricsAdapter;
+    private SeekBar playbackProgress;
+    private TextView currentTime;
+    private TextView totalTime;
+    private Button followLyrics;
     private ObjectAnimator albumAnimator;
     private Call lyricsCall;
     private MusicAidlInterface musicService;
     private boolean serviceBound;
     private String trackTitle;
     private boolean hasTimedLyrics;
+    private boolean userSeeking;
+    private boolean followCurrentLyric = true;
+    private int currentLyricLine = -1;
     private final Handler progressHandler = new Handler(Looper.getMainLooper());
     private final Runnable progressUpdater = new Runnable() {
         @Override
@@ -74,9 +82,6 @@ public class MusicPlayActivity extends BaseActivity {
             progressHandler.postDelayed(this, 300);
         }
     };
-
-    private static final Pattern TIME_PATTERN = Pattern.compile(
-            "\\[(\\d{1,3}):(\\d{1,2})(?:[.:](\\d{1,3}))?]");
 
     @Override
     public int getLayout() {
@@ -89,10 +94,52 @@ public class MusicPlayActivity extends BaseActivity {
         musicName = findViewById(R.id.tv_music_name);
         musicSinger = findViewById(R.id.tv_music_singer);
         lyricsList = findViewById(R.id.lyrics_list);
+        playbackProgress = findViewById(R.id.playback_progress);
+        currentTime = findViewById(R.id.playback_current_time);
+        totalTime = findViewById(R.id.playback_total_time);
+        followLyrics = findViewById(R.id.lyrics_follow);
         lyricsLayoutManager = new LinearLayoutManager(this);
         lyricsAdapter = new LyricsAdapter();
         lyricsList.setLayoutManager(lyricsLayoutManager);
         lyricsList.setAdapter(lyricsAdapter);
+        playbackProgress.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                if (fromUser) {
+                    currentTime.setText(formatTime(progress));
+                }
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+                userSeeking = true;
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                userSeeking = false;
+                if (musicService != null) {
+                    try {
+                        musicService.seekTo(seekBar.getProgress());
+                    } catch (RemoteException ignored) {
+                    }
+                }
+            }
+        });
+        lyricsList.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrollStateChanged(@NonNull RecyclerView recyclerView, int newState) {
+                if (newState == RecyclerView.SCROLL_STATE_DRAGGING) {
+                    followCurrentLyric = false;
+                    followLyrics.setVisibility(View.VISIBLE);
+                }
+            }
+        });
+        followLyrics.setOnClickListener(view -> {
+            followCurrentLyric = true;
+            followLyrics.setVisibility(View.GONE);
+            scrollToCurrentLyric();
+        });
         lyricsList.post(() -> {
             int verticalPadding = lyricsList.getHeight() / 2;
             lyricsList.setPadding(0, verticalPadding, 0, verticalPadding);
@@ -148,8 +195,8 @@ public class MusicPlayActivity extends BaseActivity {
             @Override
             public void onResponse(Call call, Response response) throws IOException {
                 String text = response.isSuccessful() && response.body() != null
-                        ? response.body().string() : "";
-                List<LyricLine> parsedLyrics = parseLyrics(text);
+                        ? LyricsParser.decode(response.body().bytes()) : "";
+                List<LyricLine> parsedLyrics = LyricsParser.parse(text);
                 runOnUiThread(() -> {
                     if (parsedLyrics.isEmpty()) {
                         showLyricsMessage(getString(R.string.lyrics_empty));
@@ -163,54 +210,6 @@ public class MusicPlayActivity extends BaseActivity {
         });
     }
 
-    private List<LyricLine> parseLyrics(String source) {
-        List<LyricLine> result = new ArrayList<>();
-        List<String> untimedLines = new ArrayList<>();
-        String[] lines = source.replace("\r\n", "\n").replace('\r', '\n').split("\n");
-        for (String line : lines) {
-            Matcher matcher = TIME_PATTERN.matcher(line);
-            String lyricLine = matcher.replaceAll("").trim();
-            if (lyricLine.matches("^\\[[a-zA-Z]+:.*]$") || lyricLine.isEmpty()) {
-                continue;
-            }
-            matcher.reset();
-            boolean foundTime = false;
-            while (matcher.find()) {
-                foundTime = true;
-                result.add(new LyricLine(parseTime(matcher), lyricLine));
-            }
-            if (!foundTime) {
-                untimedLines.add(lyricLine);
-            }
-        }
-        if (!result.isEmpty()) {
-            Collections.sort(result, (first, second) -> first.timeMs < second.timeMs
-                    ? -1 : first.timeMs == second.timeMs ? 0 : 1);
-            return result;
-        }
-        for (String line : untimedLines) {
-            result.add(new LyricLine(-1, line));
-        }
-        return result;
-    }
-
-    private long parseTime(Matcher matcher) {
-        long minutes = Long.parseLong(matcher.group(1));
-        long seconds = Long.parseLong(matcher.group(2));
-        String fraction = matcher.group(3);
-        long milliseconds = 0;
-        if (fraction != null) {
-            if (fraction.length() == 1) {
-                milliseconds = Long.parseLong(fraction) * 100;
-            } else if (fraction.length() == 2) {
-                milliseconds = Long.parseLong(fraction) * 10;
-            } else {
-                milliseconds = Long.parseLong(fraction.substring(0, 3));
-            }
-        }
-        return (minutes * 60 + seconds) * 1000 + milliseconds;
-    }
-
     private void showLyricsMessage(String message) {
         hasTimedLyrics = false;
         List<LyricLine> lines = new ArrayList<>();
@@ -219,6 +218,7 @@ public class MusicPlayActivity extends BaseActivity {
     }
 
     private void updateCurrentLyric() {
+        updatePlaybackProgress();
         if (!hasTimedLyrics || musicService == null || lyricsAdapter.getItemCount() == 0) {
             return;
         }
@@ -232,10 +232,38 @@ public class MusicPlayActivity extends BaseActivity {
                 currentLine = i;
             }
             if (currentLine >= 0 && lyricsAdapter.setCurrentLine(currentLine)) {
-                lyricsList.smoothScrollToPosition(currentLine);
+                currentLyricLine = currentLine;
+                scrollToCurrentLyric();
             }
         } catch (RemoteException ignored) {
         }
+    }
+
+    private void updatePlaybackProgress() {
+        if (musicService == null || userSeeking) {
+            return;
+        }
+        try {
+            long duration = Math.max(0, musicService.getDuration());
+            int position = Math.max(0, musicService.getCurrentPosition());
+            playbackProgress.setMax((int) Math.min(Integer.MAX_VALUE, duration));
+            playbackProgress.setProgress(position);
+            currentTime.setText(formatTime(position));
+            totalTime.setText(formatTime(duration));
+        } catch (RemoteException ignored) {
+        }
+    }
+
+    private void scrollToCurrentLyric() {
+        if (followCurrentLyric && currentLyricLine >= 0) {
+            lyricsList.smoothScrollToPosition(currentLyricLine);
+        }
+    }
+
+    private String formatTime(long milliseconds) {
+        long totalSeconds = Math.max(0, milliseconds) / 1000;
+        return String.format(java.util.Locale.getDefault(), "%02d:%02d",
+                totalSeconds / 60, totalSeconds % 60);
     }
 
     private final ServiceConnection serviceConnection = new ServiceConnection() {
@@ -279,16 +307,6 @@ public class MusicPlayActivity extends BaseActivity {
             albumAnimator.cancel();
         }
         super.onDestroy();
-    }
-
-    private static final class LyricLine {
-        final long timeMs;
-        final String text;
-
-        LyricLine(long timeMs, String text) {
-            this.timeMs = timeMs;
-            this.text = text;
-        }
     }
 
     private final class LyricsAdapter extends RecyclerView.Adapter<LyricsAdapter.ViewHolder> {

@@ -25,8 +25,8 @@ import com.chao.peakmusic.utils.MusicDataUtils;
 
 import java.util.List;
 
-import io.reactivex.Observer;
-import io.reactivex.disposables.Disposable;
+import io.reactivex.rxjava3.core.Observer;
+import io.reactivex.rxjava3.disposables.Disposable;
 
 /**
  * Created by Chao on 2018-09-23.

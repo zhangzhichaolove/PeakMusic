@@ -1,5 +1,7 @@
 pluginManagement {
     repositories {
+        maven { url = uri('https://maven.aliyun.com/repository/google') }
+        maven { url = uri('https://maven.aliyun.com/repository/central') }
         google()
         mavenCentral()
         gradlePluginPortal()
@@ -9,6 +11,19 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        exclusiveContent {
+            forRepository {
+                maven {
+                    name = 'AliyunGoogle'
+                    url = uri('https://maven.aliyun.com/repository/google')
+                }
+            }
+            filter {
+                includeGroupByRegex('androidx\\..*')
+                includeGroup('com.google.android.material')
+            }
+        }
+        maven { url = uri('https://maven.aliyun.com/repository/central') }
         google()
         mavenCentral()
         maven { url = uri('https://maven.aliyun.com/repository/public') }

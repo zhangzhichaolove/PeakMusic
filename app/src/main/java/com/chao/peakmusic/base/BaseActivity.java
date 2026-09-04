@@ -14,7 +14,7 @@ import com.chao.peakmusic.utils.BarUtils;
 import com.chao.peakmusic.utils.GeneralVar;
 import com.chao.peakmusic.widget.CustomToolbar;
 
-import io.reactivex.disposables.CompositeDisposable;
+import io.reactivex.rxjava3.disposables.CompositeDisposable;
 
 /**
  * Created by Chao on 2017-12-18.

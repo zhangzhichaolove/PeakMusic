@@ -23,19 +23,20 @@ import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
-import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.ActionBarDrawerToggle;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.Toolbar;
-import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.fragment.app.Fragment;
-import androidx.viewpager.widget.ViewPager;
+import androidx.viewpager2.widget.ViewPager2;
 
 import com.chao.peakmusic.activity.MusicPlayActivity;
+import com.chao.peakmusic.activity.ApiLogActivity;
 import com.chao.peakmusic.adapter.HomePageAdapter;
 import com.chao.peakmusic.base.BaseActivity;
 import com.chao.peakmusic.base.ApiAddressManager;
@@ -53,19 +54,18 @@ import com.chao.peakmusic.utils.ScanningUtils;
 import com.chao.peakmusic.utils.ToastUtils;
 import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.tabs.TabLayout;
+import com.google.android.material.tabs.TabLayoutMediator;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class MainActivity extends BaseActivity implements NavigationView.OnNavigationItemSelectedListener, ScanningUtils.ScanningListener, PlayMusicListener {
     private static final long UPDATE_INTERVAL = 500;
-    private static final int AUDIO_PERMISSION_REQ_CODE = 67;
-    private static final int NOTIFICATION_PERMISSION_REQ_CODE = 68;
     Toolbar mToolbar;
     TabLayout tabs;
     DrawerLayout mDrawerLayout;
     NavigationView nv_menu;
-    ViewPager vp_content;
+    ViewPager2 vp_content;
     FrameLayout fl_play_bar;
     ImageView iv_album_cover;
     ImageView iv_play;
@@ -82,6 +82,19 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
     private String currentTrackArtist;
     private String currentTrackImage;
     private boolean serviceBound;
+    private final ActivityResultLauncher<String> audioPermissionLauncher =
+            registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
+                if (granted) {
+                    loadMusic();
+                } else {
+                    onScanningMusicComplete(new ArrayList<>());
+                }
+                requestNotificationPermission();
+            });
+    private final ActivityResultLauncher<String> notificationPermissionLauncher =
+            registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
+                // Playback remains available when notifications are declined.
+            });
     private final Runnable positionUpdater = new Runnable() {
         @Override
         public void run() {
@@ -115,9 +128,11 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         getSupportActionBar().setHomeButtonEnabled(true); //设置返回键可用
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         fragments = new Fragment[]{OnLineMusicFragment.newInstance(), LocalMusicFragment.newInstance()};
-        pageAdapter = new HomePageAdapter(getSupportFragmentManager(), fragments);
+        pageAdapter = new HomePageAdapter(this, fragments);
         vp_content.setAdapter(pageAdapter);
-        tabs.setupWithViewPager(vp_content);
+        new TabLayoutMediator(tabs, vp_content,
+                (tab, position) -> tab.setText(position == 0
+                        ? R.string.online_music : R.string.local_music)).attach();
         handler = new Handler(Looper.getMainLooper());
         ImageLoaderV4.getInstance().loadCircle(mContext, iv_album_cover, R.drawable.default_cover);
         //getSupportFragmentManager().beginTransaction().add(R.id.fl_content, LocalMusicFragment.newInstance(), LocalMusicFragment.class.getName()).commit();
@@ -129,11 +144,9 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
             loadMusic();
             requestNotificationPermission();
         } else {
-            ActivityCompat.requestPermissions(this,
-                    new String[]{Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-                            ? Manifest.permission.READ_MEDIA_AUDIO
-                            : Manifest.permission.READ_EXTERNAL_STORAGE},
-                    AUDIO_PERMISSION_REQ_CODE);
+            audioPermissionLauncher.launch(Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                    ? Manifest.permission.READ_MEDIA_AUDIO
+                    : Manifest.permission.READ_EXTERNAL_STORAGE);
         }
         startTrackingPosition();
     }
@@ -158,23 +171,7 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
                 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.POST_NOTIFICATIONS},
-                    NOTIFICATION_PERMISSION_REQ_CODE);
-        }
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
-                                           @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == AUDIO_PERMISSION_REQ_CODE) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                loadMusic();
-            } else {
-                onScanningMusicComplete(new ArrayList<>());
-            }
-            requestNotificationPermission();
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
         }
     }
 
@@ -217,6 +214,10 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
             showApiAddressDialog();
             return true;
         }
+        if (item.getItemId() == R.id.action_api_logs) {
+            startActivity(new Intent(this, ApiLogActivity.class));
+            return true;
+        }
         return false;
     }
 
@@ -252,7 +253,6 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         dialog.show();
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     @Override
     public void onClick(View view) {
         super.onClick(view);

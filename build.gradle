@@ -3,8 +3,6 @@ plugins {
     id 'com.android.library' version '9.4.0' apply false
 }
 
-apply from: 'config.gradle'
-
 tasks.register('clean', Delete) {
     delete rootProject.layout.buildDirectory
 }

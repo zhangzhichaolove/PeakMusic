@@ -4,6 +4,10 @@
         android:id="@+id/action_api_address"
         android:icon="@drawable/ic_menu_settings"
         android:title="@string/menu_api_address" />
+    <item
+        android:id="@+id/action_api_logs"
+        android:icon="@drawable/ic_menu_search"
+        android:title="@string/api_logs_title" />
     <group android:checkableBehavior="single">
         <item
             android:id="@+id/action_setting"

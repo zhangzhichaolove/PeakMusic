@@ -38,4 +38,17 @@
     <string name="retry">重试</string>
     <string name="unknown_error">未知错误</string>
     <string name="local_music_empty">未找到本地音乐，请确认已授予音乐访问权限</string>
+    <string name="online_music">在线音乐</string>
+    <string name="local_music">本地音乐</string>
+    <string name="playback_progress">播放进度</string>
+    <string name="follow_current_lyric">回到当前歌词</string>
+    <string name="api_logs_title">API 响应日志</string>
+    <string name="api_logs_empty">暂无大响应日志（超过 256 KiB 的响应会保存在这里）</string>
+    <string name="api_log_item">%1$s\n%2$s · %3$s</string>
+    <string name="api_log_copy_path">复制路径</string>
+    <string name="api_log_copy_content">复制内容</string>
+    <string name="api_log_share">分享</string>
+    <string name="api_log_clear">清空</string>
+    <string name="api_log_read_failed">读取失败：%1$s</string>
+    <string name="copied">已复制</string>
 </resources>

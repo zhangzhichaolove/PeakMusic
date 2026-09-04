@@ -7,7 +7,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonParser;
 
 final class PrettyJsonLogger {
-    private static final String TAG = "API_RESPONSE_JSON";
+    static final String TAG = "API_RESPONSE_JSON";
     private static final int MAX_CHARS_PER_LOG = 1000;
     private static final Gson PRETTY_GSON = new GsonBuilder()
             .setPrettyPrinting()
@@ -16,7 +16,7 @@ final class PrettyJsonLogger {
     private PrettyJsonLogger() {
     }
 
-    static void log(String url, String body) {
+    static void log(long requestId, String url, String body) {
         String formattedBody = body;
         try {
             formattedBody = PRETTY_GSON.toJson(new JsonParser().parse(body));
@@ -24,11 +24,11 @@ final class PrettyJsonLogger {
             // 非 JSON 响应仍按原文完整打印，便于定位服务端错误。
         }
 
-        Log.d(TAG, "Response: " + url);
+        Log.d(TAG, "#" + requestId + " response: " + url);
         for (String line : formattedBody.split("\\n", -1)) {
             logCompleteLine(line);
         }
-        Log.d(TAG, "End response: " + url);
+        Log.d(TAG, "#" + requestId + " end response");
     }
 
     private static void logCompleteLine(String line) {
