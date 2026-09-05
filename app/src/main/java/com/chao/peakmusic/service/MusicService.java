@@ -21,6 +21,7 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.RemoteException;
 import android.os.RemoteCallbackList;
+import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -41,6 +42,7 @@ import com.chao.peakmusic.model.SongModel;
 import com.chao.peakmusic.data.MusicLibraryRepository;
 import com.chao.peakmusic.data.MusicTrackEntity;
 import com.chao.peakmusic.utils.LogUtils;
+import com.cleveroad.audiowidget.AudioWidget;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -57,6 +59,8 @@ public class MusicService extends Service {
             "com.chao.peakmusic.action.PLAY_LIBRARY_QUEUE";
     public static final String ACTION_SET_SLEEP_TIMER =
             "com.chao.peakmusic.action.SET_SLEEP_TIMER";
+    public static final String ACTION_SHOW_FLOATING_CONTROL =
+            "com.chao.peakmusic.action.SHOW_FLOATING_CONTROL";
     public static final String EXTRA_LIBRARY_QUEUE = "library_queue";
     public static final String EXTRA_LIBRARY_POSITION = "library_position";
     public static final String EXTRA_SLEEP_DELAY = "sleep_delay";
@@ -77,6 +81,9 @@ public class MusicService extends Service {
     private static final String KEY_POSITION = "position";
     private static final String KEY_MODE = "mode";
     private static final String KEY_PLAYING = "playing";
+    private static final String FLOATING_PREFERENCES = "floating_control";
+    private static final String KEY_FLOATING_X = "x";
+    private static final String KEY_FLOATING_Y = "y";
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Random random = new Random();
@@ -95,6 +102,16 @@ public class MusicService extends Service {
         getSharedPreferences(SLEEP_PREFERENCES, MODE_PRIVATE).edit()
                 .remove(KEY_SLEEP_END).apply();
     };
+    private final Runnable floatingProgressUpdater = new Runnable() {
+        @Override
+        public void run() {
+            if (audioWidget != null && audioWidget.isShown() && prepared) {
+                audioWidget.controller().duration((int) currentDuration());
+                audioWidget.controller().position((int) currentPlaybackPosition());
+            }
+            mainHandler.postDelayed(this, 1000);
+        }
+    };
     private final BroadcastReceiver noisyReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -106,6 +123,7 @@ public class MusicService extends Service {
 
     private MediaPlayer mediaPlayer;
     private MediaSessionCompat mediaSession;
+    private AudioWidget audioWidget;
     private AudioManager audioManager;
     private AudioFocusRequest audioFocusRequest;
     private ArrayList<SongModel> music = new ArrayList<>();
@@ -152,9 +170,11 @@ public class MusicService extends Service {
         createMediaSession();
         createPlayer();
         restorePlaybackState();
+        showFloatingControl();
         registerNoisyReceiver();
         startForeground(NOTIFICATION_ID, buildNotification());
         mainHandler.postDelayed(stateSaver, 5000);
+        mainHandler.post(floatingProgressUpdater);
         restoreSleepTimer();
         LogUtils.showTagE("服务创建");
     }
@@ -189,6 +209,122 @@ public class MusicService extends Service {
             }
         } else if (ACTION_NEXT.equals(action)) {
             nextTrack();
+        } else if (ACTION_SHOW_FLOATING_CONTROL.equals(action)) {
+            showFloatingControl();
+        }
+    }
+
+    private void showFloatingControl() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                && !Settings.canDrawOverlays(this)) {
+            return;
+        }
+        if (audioWidget == null) {
+            audioWidget = new AudioWidget.Builder(this).build();
+            audioWidget.controller().onControlsClickListener(createFloatingControlsListener());
+            audioWidget.controller().onWidgetStateChangedListener(
+                    new AudioWidget.OnWidgetStateChangedListener() {
+                        @Override
+                        public void onWidgetStateChanged(AudioWidget.State state) {
+                            // No additional action is needed when the widget expands or collapses.
+                        }
+
+                        @Override
+                        public void onWidgetPositionChanged(int cx, int cy) {
+                            getSharedPreferences(FLOATING_PREFERENCES, MODE_PRIVATE).edit()
+                                    .putInt(KEY_FLOATING_X, cx)
+                                    .putInt(KEY_FLOATING_Y, cy)
+                                    .apply();
+                        }
+                    });
+        }
+        if (!audioWidget.isShown()) {
+            SharedPreferences preferences = getSharedPreferences(
+                    FLOATING_PREFERENCES, MODE_PRIVATE);
+            int defaultX = getResources().getDisplayMetrics().widthPixels;
+            int defaultY = getResources().getDisplayMetrics().heightPixels / 2;
+            try {
+                audioWidget.show(preferences.getInt(KEY_FLOATING_X, defaultX),
+                        preferences.getInt(KEY_FLOATING_Y, defaultY));
+            } catch (RuntimeException error) {
+                Log.w(TAG, "Unable to show floating playback control", error);
+                audioWidget.hide();
+                return;
+            }
+        }
+        syncFloatingControl(isPlaying()
+                ? PlaybackStateCompat.STATE_PLAYING : PlaybackStateCompat.STATE_PAUSED);
+    }
+
+    private AudioWidget.OnControlsClickListener createFloatingControlsListener() {
+        return new AudioWidget.OnControlsClickListener() {
+            @Override
+            public boolean onPlaylistClicked() {
+                return false;
+            }
+
+            @Override
+            public void onPlaylistLongClicked() {
+            }
+
+            @Override
+            public void onPreviousClicked() {
+                previousTrack();
+            }
+
+            @Override
+            public void onPreviousLongClicked() {
+            }
+
+            @Override
+            public boolean onPlayPauseClicked(boolean shouldPlay) {
+                if (shouldPlay) {
+                    playOrRequestDefault();
+                } else {
+                    pausePlayback(true);
+                }
+                return true;
+            }
+
+            @Override
+            public void onPlayPauseLongClicked() {
+            }
+
+            @Override
+            public void onNextClicked() {
+                nextTrack();
+            }
+
+            @Override
+            public void onNextLongClicked() {
+            }
+
+            @Override
+            public void onAlbumClicked() {
+                startActivity(new Intent(MusicService.this, MainActivity.class)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                                | Intent.FLAG_ACTIVITY_CLEAR_TOP));
+            }
+
+            @Override
+            public void onAlbumLongClicked() {
+            }
+        };
+    }
+
+    private void syncFloatingControl(int state) {
+        if (audioWidget == null) {
+            return;
+        }
+        audioWidget.controller().duration((int) currentDuration());
+        audioWidget.controller().position((int) currentPlaybackPosition());
+        if (state == PlaybackStateCompat.STATE_PLAYING) {
+            audioWidget.controller().start();
+        } else if (state == PlaybackStateCompat.STATE_PAUSED
+                || state == PlaybackStateCompat.STATE_BUFFERING) {
+            audioWidget.controller().pause();
+        } else {
+            audioWidget.controller().stop();
         }
     }
 
@@ -581,6 +717,7 @@ public class MusicService extends Service {
                 .setState(state, currentPlaybackPosition(),
                         state == PlaybackStateCompat.STATE_PLAYING ? 1f : 0f)
                 .build());
+        syncFloatingControl(state);
         updateNotification();
     }
 
@@ -791,6 +928,12 @@ public class MusicService extends Service {
         mainHandler.removeCallbacksAndMessages(null);
         unregisterReceiver(noisyReceiver);
         abandonAudioFocus();
+        if (audioWidget != null) {
+            audioWidget.controller().onControlsClickListener(null);
+            audioWidget.controller().onWidgetStateChangedListener(null);
+            audioWidget.hide();
+            audioWidget = null;
+        }
         if (mediaPlayer != null) {
             mediaPlayer.reset();
             mediaPlayer.release();

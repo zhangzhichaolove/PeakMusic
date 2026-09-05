@@ -14,6 +14,8 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.RemoteException;
 import android.content.pm.PackageManager;
+import android.net.Uri;
+import android.provider.Settings;
 import android.text.InputType;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -105,6 +107,13 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
     private final ActivityResultLauncher<String> notificationPermissionLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
                 // Playback remains available when notifications are declined.
+                requestFloatingControlPermission();
+            });
+    private final ActivityResultLauncher<Intent> overlayPermissionLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+                if (canDrawOverlays()) {
+                    showFloatingControl();
+                }
             });
     private final Runnable positionUpdater = new Runnable() {
         @Override
@@ -182,7 +191,29 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
                 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED) {
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
+        } else {
+            requestFloatingControlPermission();
         }
+    }
+
+    private void requestFloatingControlPermission() {
+        if (canDrawOverlays()) {
+            showFloatingControl();
+            return;
+        }
+        Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:" + getPackageName()));
+        overlayPermissionLauncher.launch(intent);
+    }
+
+    private boolean canDrawOverlays() {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(this);
+    }
+
+    private void showFloatingControl() {
+        Intent intent = new Intent(this, MusicService.class)
+                .setAction(MusicService.ACTION_SHOW_FLOATING_CONTROL);
+        ContextCompat.startForegroundService(this, intent);
     }
 
     @Override

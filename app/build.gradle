@@ -37,6 +37,7 @@ android {
 
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation project(':audiowidget')
     //implementation 'com.android.support:appcompat-v7:26.1.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.2.2'
     //noinspection GradleDependency -- newer releases require minSdk 23.
