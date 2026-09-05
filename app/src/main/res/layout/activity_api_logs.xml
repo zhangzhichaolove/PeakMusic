@@ -2,75 +2,89 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="12dp">
+    android:orientation="vertical">
 
-    <TextView
-        android:id="@+id/api_log_empty"
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/api_log_toolbar"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center"
-        android:padding="16dp"
-        android:text="@string/api_logs_empty" />
+        android:layout_height="?attr/actionBarSize"
+        android:background="?attr/colorPrimary"
+        android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar" />
 
-    <ListView
-        android:id="@+id/api_log_list"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:choiceMode="singleChoice" />
+        android:orientation="vertical"
+        android:padding="12dp">
 
-    <TextView
-        android:id="@+id/api_log_preview"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_marginTop="8dp"
-        android:layout_weight="1"
-        android:background="#11000000"
-        android:fontFamily="monospace"
-        android:padding="8dp"
-        android:scrollbars="vertical|horizontal"
-        android:textIsSelectable="true"
-        android:textSize="12sp" />
-
-    <HorizontalScrollView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:fillViewport="true">
-
-        <LinearLayout
-            style="?android:attr/buttonBarStyle"
-            android:layout_width="wrap_content"
+        <TextView
+            android:id="@+id/api_log_empty"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
+            android:gravity="center"
+            android:padding="16dp"
+            android:text="@string/api_logs_empty" />
 
-            <Button
-                android:id="@+id/api_log_copy_path"
-                style="?android:attr/buttonBarButtonStyle"
+        <ListView
+            android:id="@+id/api_log_list"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:choiceMode="singleChoice" />
+
+        <TextView
+            android:id="@+id/api_log_preview"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="8dp"
+            android:layout_weight="1"
+            android:background="#11000000"
+            android:fontFamily="monospace"
+            android:padding="8dp"
+            android:scrollbars="vertical|horizontal"
+            android:textIsSelectable="true"
+            android:textSize="12sp" />
+
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fillViewport="true">
+
+            <LinearLayout
+                style="?android:attr/buttonBarStyle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/api_log_copy_path" />
+                android:orientation="horizontal">
 
-            <Button
-                android:id="@+id/api_log_copy_content"
-                style="?android:attr/buttonBarButtonStyle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/api_log_copy_content" />
+                <Button
+                    android:id="@+id/api_log_copy_path"
+                    style="?android:attr/buttonBarButtonStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/api_log_copy_path" />
 
-            <Button
-                android:id="@+id/api_log_share"
-                style="?android:attr/buttonBarButtonStyle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/api_log_share" />
+                <Button
+                    android:id="@+id/api_log_copy_content"
+                    style="?android:attr/buttonBarButtonStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/api_log_copy_content" />
 
-            <Button
-                android:id="@+id/api_log_clear"
-                style="?android:attr/buttonBarButtonStyle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/api_log_clear" />
-        </LinearLayout>
-    </HorizontalScrollView>
+                <Button
+                    android:id="@+id/api_log_share"
+                    style="?android:attr/buttonBarButtonStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/api_log_share" />
+
+                <Button
+                    android:id="@+id/api_log_clear"
+                    style="?android:attr/buttonBarButtonStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/api_log_clear" />
+            </LinearLayout>
+        </HorizontalScrollView>
+    </LinearLayout>
 </LinearLayout>

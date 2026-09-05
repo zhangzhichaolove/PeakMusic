@@ -28,6 +28,7 @@ import com.chao.peakmusic.data.MusicTrackEntity;
 import com.chao.peakmusic.data.PlaylistSummary;
 import com.chao.peakmusic.databinding.ItemPlaylistBinding;
 import com.chao.peakmusic.service.MusicService;
+import com.chao.peakmusic.utils.BarUtils;
 import com.chao.peakmusic.utils.MusicActions;
 import com.chao.peakmusic.utils.ToastUtils;
 
@@ -57,10 +58,12 @@ public class MusicLibraryActivity extends AppCompatActivity {
     @Override
     protected void onCreate(android.os.Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        BarUtils.setWindow(this);
         setContentView(R.layout.activity_music_library);
         mode = getIntent().getStringExtra(EXTRA_MODE);
         repository = MusicLibraryRepository.get(this);
         toolbar = findViewById(R.id.library_toolbar);
+        BarUtils.applyTopInset(toolbar);
         list = findViewById(R.id.library_list);
         emptyView = findViewById(R.id.library_empty);
         setSupportActionBar(toolbar);

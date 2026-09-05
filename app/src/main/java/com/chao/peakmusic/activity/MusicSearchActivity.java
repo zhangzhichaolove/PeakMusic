@@ -19,6 +19,7 @@ import com.chao.peakmusic.data.MusicTrackEntity;
 import com.chao.peakmusic.model.MusicModel;
 import com.chao.peakmusic.model.SongModel;
 import com.chao.peakmusic.service.MusicService;
+import com.chao.peakmusic.utils.BarUtils;
 import com.chao.peakmusic.utils.MusicActions;
 import com.chao.peakmusic.utils.MusicDataUtils;
 import com.chao.peakmusic.utils.ScanningUtils;
@@ -36,8 +37,10 @@ public class MusicSearchActivity extends AppCompatActivity {
     @Override
     protected void onCreate(android.os.Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        BarUtils.setWindow(this);
         setContentView(R.layout.activity_music_search);
         Toolbar toolbar = findViewById(R.id.search_toolbar);
+        BarUtils.applyTopInset(toolbar);
         setSupportActionBar(toolbar);
         toolbar.setTitle(R.string.search_music);
         toolbar.setNavigationIcon(R.drawable.menu_setting_back);

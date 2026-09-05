@@ -14,11 +14,13 @@ import android.widget.TextView;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 import androidx.core.content.FileProvider;
 
 import com.chao.peakmusic.R;
 import com.chao.peakmusic.base.ApiResponseLogStore;
 import com.chao.peakmusic.base.PrettyJsonFormatter;
+import com.chao.peakmusic.utils.BarUtils;
 import com.chao.peakmusic.utils.ToastUtils;
 
 import java.io.File;
@@ -44,8 +46,14 @@ public final class ApiLogActivity extends AppCompatActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        BarUtils.setWindow(this);
         setContentView(R.layout.activity_api_logs);
-        setTitle(R.string.api_logs_title);
+        Toolbar toolbar = findViewById(R.id.api_log_toolbar);
+        BarUtils.applyTopInset(toolbar);
+        setSupportActionBar(toolbar);
+        getSupportActionBar().setTitle(R.string.api_logs_title);
+        toolbar.setNavigationIcon(R.drawable.menu_setting_back);
+        toolbar.setNavigationOnClickListener(view -> finish());
         preview = findViewById(R.id.api_log_preview);
         empty = findViewById(R.id.api_log_empty);
         copyPath = findViewById(R.id.api_log_copy_path);
