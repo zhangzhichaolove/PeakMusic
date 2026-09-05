@@ -16,6 +16,7 @@ import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -27,7 +28,6 @@ import android.util.Log;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
-import androidx.core.content.IntentCompat;
 import androidx.media.app.NotificationCompat.MediaStyle;
 
 import android.support.v4.media.MediaMetadataCompat;
@@ -38,7 +38,6 @@ import com.chao.peakmusic.ActivityCall;
 import com.chao.peakmusic.MainActivity;
 import com.chao.peakmusic.MusicAidlInterface;
 import com.chao.peakmusic.R;
-import com.chao.peakmusic.model.SongModel;
 import com.chao.peakmusic.data.MusicLibraryRepository;
 import com.chao.peakmusic.data.MusicTrackEntity;
 import com.chao.peakmusic.utils.LogUtils;
@@ -54,15 +53,13 @@ import java.util.Random;
  * Music playback service with audio focus, MediaSession and foreground controls.
  */
 public class MusicService extends Service {
-    public static final String EXTRAS_MUSIC = "extras_music";
     public static final String ACTION_PLAY_LIBRARY_QUEUE =
             "com.chao.peakmusic.action.PLAY_LIBRARY_QUEUE";
     public static final String ACTION_SET_SLEEP_TIMER =
             "com.chao.peakmusic.action.SET_SLEEP_TIMER";
     public static final String ACTION_SHOW_FLOATING_CONTROL =
             "com.chao.peakmusic.action.SHOW_FLOATING_CONTROL";
-    public static final String EXTRA_LIBRARY_QUEUE = "library_queue";
-    public static final String EXTRA_LIBRARY_POSITION = "library_position";
+    public static final int QUEUE_PAGE_SIZE = 100;
     public static final String EXTRA_SLEEP_DELAY = "sleep_delay";
     public static final String SLEEP_PREFERENCES = "sleep_timer";
     public static final String KEY_SLEEP_END = "end_time";
@@ -73,23 +70,15 @@ public class MusicService extends Service {
     private static final String ACTION_PREVIOUS = "com.chao.peakmusic.action.PREVIOUS";
     private static final String ACTION_TOGGLE = "com.chao.peakmusic.action.TOGGLE";
     private static final String ACTION_NEXT = "com.chao.peakmusic.action.NEXT";
-    private static final String STATE_PREFERENCES = "playback_state";
-    private static final String KEY_LOCAL_QUEUE = "local_queue";
-    private static final String KEY_ONLINE_QUEUE = "online_queue";
-    private static final String KEY_ACTIVE_LOCAL = "active_local";
-    private static final String KEY_INDEX = "index";
-    private static final String KEY_POSITION = "position";
-    private static final String KEY_MODE = "mode";
-    private static final String KEY_PLAYING = "playing";
-    private static final String FLOATING_PREFERENCES = "floating_control";
+    public static final String ACTION_HIDE_FLOATING_CONTROL = "com.chao.peakmusic.HIDE_FLOATING_CONTROL";
+    public static final String KEY_FLOATING_ENABLED = "enabled";
+    public static final String FLOATING_PREFERENCES = "floating_control";
     private static final String KEY_FLOATING_X = "x";
     private static final String KEY_FLOATING_Y = "y";
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Random random = new Random();
     private final ArrayList<QueueItem> activeQueue = new ArrayList<>();
-    private final ArrayList<QueueItem> localQueue = new ArrayList<>();
-    private final ArrayList<QueueItem> onlineQueue = new ArrayList<>();
     private final Runnable stateSaver = new Runnable() {
         @Override
         public void run() {
@@ -126,11 +115,22 @@ public class MusicService extends Service {
     private AudioWidget audioWidget;
     private AudioManager audioManager;
     private AudioFocusRequest audioFocusRequest;
-    private ArrayList<SongModel> music = new ArrayList<>();
-    private SongModel currentMusic;
+    private PlaybackStorage storage;
+    private boolean restoring = true;
+    private boolean destroyed;
+    private boolean persistenceFailed;
+    private boolean modeChangedDuringRestore;
+    private Boolean restorePlayOverride;
+    private long loadGeneration;
+    private String appliedRequestId;
     private final RemoteCallbackList<ActivityCall> activityCallbacks = new RemoteCallbackList<>();
     private boolean isLocal;
     private boolean prepared;
+    private boolean preparing;
+    private boolean queuesDirty = true;
+    private long queueVersion = System.nanoTime();
+    private int playbackState = PlaybackStateCompat.STATE_NONE;
+    private String playbackError = "";
     private boolean resumeOnFocusGain;
     private int currentPosition = -1;
     private int playMode = PlaybackModeNavigator.SEQUENTIAL;
@@ -147,15 +147,16 @@ public class MusicService extends Service {
             }
             if (resumeOnFocusGain) {
                 resumeOnFocusGain = false;
-                startPlayback();
+                playOrRequestDefault();
             }
         } else if (focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK) {
             if (mediaPlayer != null) {
                 mediaPlayer.setVolume(0.2f, 0.2f);
             }
         } else if (focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
-            resumeOnFocusGain = isPlaying();
+            boolean shouldResume = isPlaying() || (preparing && playWhenPrepared);
             pausePlayback(true);
+            resumeOnFocusGain = shouldResume;
         } else if (focusChange == AudioManager.AUDIOFOCUS_LOSS) {
             resumeOnFocusGain = false;
             pausePlayback(true);
@@ -169,7 +170,8 @@ public class MusicService extends Service {
         createNotificationChannel();
         createMediaSession();
         createPlayer();
-        restorePlaybackState();
+        storage = PlaybackStorage.get(this);
+        loadPlayback(null);
         showFloatingControl();
         registerNoisyReceiver();
         startForeground(NOTIFICATION_ID, buildNotification());
@@ -182,15 +184,10 @@ public class MusicService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null) {
-            ArrayList<SongModel> songs = IntentCompat.getParcelableArrayListExtra(
-                    intent, EXTRAS_MUSIC, SongModel.class);
-            if (songs != null) {
-                music = songs;
-                rebuildLocalQueue();
-            }
             handleAction(intent.getAction());
             if (ACTION_PLAY_LIBRARY_QUEUE.equals(intent.getAction())) {
-                playLibraryQueue(intent);
+                String id = intent.getStringExtra(PlaybackStorage.EXTRA_QUEUE_ID);
+                if (id != null && storage.isCurrent(id)) loadPlayback(id);
             } else if (ACTION_SET_SLEEP_TIMER.equals(intent.getAction())) {
                 setSleepTimer(intent.getLongExtra(EXTRA_SLEEP_DELAY, 0));
             }
@@ -205,16 +202,19 @@ public class MusicService extends Service {
             if (isPlaying()) {
                 pausePlayback(true);
             } else {
-                startPlayback();
+                playOrRequestDefault();
             }
         } else if (ACTION_NEXT.equals(action)) {
             nextTrack();
         } else if (ACTION_SHOW_FLOATING_CONTROL.equals(action)) {
             showFloatingControl();
+        } else if (ACTION_HIDE_FLOATING_CONTROL.equals(action)) {
+            if (audioWidget != null) audioWidget.hide();
         }
     }
 
     private void showFloatingControl() {
+        if (!getSharedPreferences(FLOATING_PREFERENCES, MODE_PRIVATE).getBoolean(KEY_FLOATING_ENABLED, false)) return;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
                 && !Settings.canDrawOverlays(this)) {
             return;
@@ -332,6 +332,7 @@ public class MusicService extends Service {
         mediaPlayer = new MediaPlayer();
         setPlayerAudioAttributes();
         mediaPlayer.setOnPreparedListener(player -> {
+            preparing = false;
             prepared = true;
             if (pendingSeekPosition > 0) {
                 player.seekTo(Math.min(pendingSeekPosition, Math.max(0, player.getDuration() - 1)));
@@ -351,9 +352,7 @@ public class MusicService extends Service {
             nextTrack(true);
         });
         mediaPlayer.setOnErrorListener((player, what, extra) -> {
-            prepared = false;
-            updatePlaybackState(PlaybackStateCompat.STATE_ERROR);
-            notifyPlayingState(false);
+            reportPlaybackError();
             Log.e(TAG, "MediaPlayer error: what=" + what + ", extra=" + extra);
             return true;
         });
@@ -398,23 +397,18 @@ public class MusicService extends Service {
         updatePlaybackState(PlaybackStateCompat.STATE_NONE);
     }
 
-    private void playMusic(String source) {
-        prepareSource(source, true, 0);
-    }
-
     private void prepareSource(String source, boolean shouldPlay, int seekPosition) {
         if (TextUtils.isEmpty(source)) {
-            updatePlaybackState(PlaybackStateCompat.STATE_ERROR);
+            reportPlaybackError();
             return;
         }
         try {
             prepared = false;
+            preparing = true;
+            playbackError = "";
             currentSource = source;
             playWhenPrepared = shouldPlay;
             pendingSeekPosition = Math.max(0, seekPosition);
-            if (mediaPlayer.isPlaying()) {
-                mediaPlayer.stop();
-            }
             mediaPlayer.reset();
             setPlayerAudioAttributes();
             if (source.startsWith("content://")) {
@@ -426,37 +420,55 @@ public class MusicService extends Service {
             updateMetadata();
             updatePlaybackState(PlaybackStateCompat.STATE_BUFFERING);
             mediaPlayer.prepareAsync();
-        } catch (IOException | IllegalArgumentException | IllegalStateException error) {
-            prepared = false;
-            updatePlaybackState(PlaybackStateCompat.STATE_ERROR);
-            notifyPlayingState(false);
+        } catch (IOException | IllegalArgumentException | IllegalStateException | SecurityException error) {
+            reportPlaybackError();
             Log.e(TAG, "Unable to play " + source, error);
         }
     }
 
     private void startPlayback() {
-        if (!prepared || !requestAudioFocus()) {
+        if (!prepared) {
+            return;
+        }
+        if (!requestAudioFocus()) {
+            pausePlayback(true);
+            playbackError = getString(R.string.audio_focus_unavailable);
             return;
         }
         try {
+            playWhenPrepared = true;
+            playbackError = "";
             mediaPlayer.start();
             updatePlaybackState(PlaybackStateCompat.STATE_PLAYING);
             notifyPlayingState(true);
             savePlaybackState();
         } catch (IllegalStateException error) {
+            reportPlaybackError();
             Log.e(TAG, "Unable to resume playback", error);
         }
     }
 
     private void playOrRequestDefault() {
+        restorePlayOverride = true;
+        storage.cancelPending();
+        if (restoring) return;
         if (prepared) {
             startPlayback();
+        } else if (preparing) {
+            playWhenPrepared = true;
+            updatePlaybackState(PlaybackStateCompat.STATE_BUFFERING);
+        } else if (!TextUtils.isEmpty(currentSource)) {
+            prepareSource(currentSource, true, pendingSeekPosition);
         } else {
             broadcastCallback(ActivityCall::defaultPlay, "request default track");
         }
     }
 
     private void pausePlayback(boolean notifyActivity) {
+        restorePlayOverride = false;
+        storage.cancelPending();
+        playWhenPrepared = false;
+        resumeOnFocusGain = false;
         if (isPlaying()) {
             mediaPlayer.pause();
         }
@@ -465,6 +477,15 @@ public class MusicService extends Service {
         if (notifyActivity) {
             notifyPlayingState(false);
         }
+    }
+
+    private void reportPlaybackError() {
+        prepared = false;
+        preparing = false;
+        playWhenPrepared = false;
+        playbackError = getString(R.string.music_playback_failed);
+        updatePlaybackState(PlaybackStateCompat.STATE_ERROR);
+        notifyPlayingState(false);
     }
 
     private boolean requestAudioFocus() {
@@ -511,34 +532,17 @@ public class MusicService extends Service {
         audioManager.abandonAudioFocus(focusChangeListener);
     }
 
-    private void openLocalTrack(int position) {
-        if (music == null || music.isEmpty()) {
-            return;
-        }
-        int normalized = (position % music.size() + music.size()) % music.size();
-        currentPosition = normalized;
-        currentMusic = music.get(normalized);
-        isLocal = true;
-        currentTrackName = safeText(currentMusic.getSong(), getString(R.string.unknown_music));
-        currentTrackArtist = safeText(currentMusic.getSinger(), getString(R.string.unknown_singer));
-        rebuildLocalQueue();
-        activeQueue.clear();
-        activeQueue.addAll(localQueue);
-        openQueueTrack(normalized, true);
-    }
-
     private void nextTrack() {
         nextTrack(false);
     }
 
     private void nextTrack(boolean automatic) {
+        if (!automatic) storage.cancelPending();
         int next = PlaybackModeNavigator.next(currentPosition, activeQueue.size(), playMode,
                 automatic, random);
         if (next >= 0) {
             openQueueTrack(next, true);
-        } else if (activeQueue.isEmpty()) {
-            broadcastCallback(ActivityCall::next, "request next track");
-        } else {
+        } else if (!activeQueue.isEmpty() && automatic) {
             playWhenPrepared = false;
             updatePlaybackState(PlaybackStateCompat.STATE_STOPPED);
             notifyPlayingState(false);
@@ -547,11 +551,10 @@ public class MusicService extends Service {
     }
 
     private void previousTrack() {
+        storage.cancelPending();
         int previous = PlaybackModeNavigator.previous(currentPosition, activeQueue.size(), playMode);
         if (previous >= 0) {
             openQueueTrack(previous, true);
-        } else if (activeQueue.isEmpty()) {
-            broadcastCallback(ActivityCall::pre, "request previous track");
         }
     }
 
@@ -560,54 +563,130 @@ public class MusicService extends Service {
             return;
         }
         currentPosition = position;
+        queueVersion++;
         QueueItem item = activeQueue.get(position);
+        MusicLibraryRepository.get(this).saveMetadata(item.metadata);
         isLocal = item.local;
         currentTrackName = item.name;
         currentTrackArtist = item.artist;
         currentSource = item.source;
         notifyTrackChanged();
-        MusicLibraryRepository.get(this).recordPlayback(currentSource,
+        MusicLibraryRepository.get(this).recordPlayback(item.key(),
                 currentTrackName, currentTrackArtist, isLocal);
         prepareSource(currentSource, shouldPlay, 0);
+        savePlaybackState();
     }
 
-    public static Intent createQueueIntent(Context context,
-                                           ArrayList<MusicTrackEntity> tracks,
-                                           int position) {
-        return new Intent(context, MusicService.class)
-                .setAction(ACTION_PLAY_LIBRARY_QUEUE)
-                .putParcelableArrayListExtra(EXTRA_LIBRARY_QUEUE, tracks)
-                .putExtra(EXTRA_LIBRARY_POSITION, position);
-    }
-
-    private void playLibraryQueue(Intent intent) {
-        ArrayList<MusicTrackEntity> values = IntentCompat.getParcelableArrayListExtra(
-                intent, EXTRA_LIBRARY_QUEUE, MusicTrackEntity.class);
-        if (values == null) {
+    private void playLibraryQueue(PlaybackStorage.Request request, boolean shouldPlay) {
+        if (request.next) {
+            appliedRequestId = request.id;
+            enqueueNext(request.tracks.get(0), shouldPlay);
             return;
         }
+        ArrayList<QueueItem> replacement = new ArrayList<>();
+        for (MusicTrackEntity track : request.tracks) {
+            if (track != null && !TextUtils.isEmpty(track.source)) replacement.add(new QueueItem(track));
+        }
+        if (replacement.isEmpty()) return;
+        appliedRequestId = request.id;
+        queuesDirty = true;
+        queueVersion++;
         activeQueue.clear();
-        for (MusicTrackEntity track : values) {
-            if (track != null && !TextUtils.isEmpty(track.source)) {
-                activeQueue.add(new QueueItem(track.source,
-                        safeText(track.name, getString(R.string.unknown_music)),
-                        safeText(track.artist, getString(R.string.unknown_singer)),
-                        track.local));
-            }
+        activeQueue.addAll(replacement);
+        openQueueTrack(Math.max(0, Math.min(request.position, activeQueue.size() - 1)), shouldPlay);
+    }
+
+    private void enqueueNext(MusicTrackEntity track, boolean shouldPlay) {
+        if (track == null || TextUtils.isEmpty(track.source)) return;
+        activeQueue.add(Math.min(currentPosition + 1, activeQueue.size()), new QueueItem(track));
+        queueVersion++;
+        queuesDirty = true;
+        if (currentPosition < 0) openQueueTrack(0, shouldPlay);
+        else savePlaybackState();
+    }
+
+    private Bundle queuePage(int requestedOffset) {
+        int lastPage = activeQueue.isEmpty() ? 0 : (activeQueue.size() - 1) / QUEUE_PAGE_SIZE * QUEUE_PAGE_SIZE;
+        int offset = Math.max(0, Math.min(requestedOffset, lastPage));
+        ArrayList<String> names = new ArrayList<>(), artists = new ArrayList<>();
+        for (int i = offset; i < Math.min(offset + QUEUE_PAGE_SIZE, activeQueue.size()); i++) {
+            names.add(queueLabel(activeQueue.get(i).name));
+            artists.add(queueLabel(activeQueue.get(i).artist));
         }
-        if (!activeQueue.isEmpty()) {
-            int position = Math.max(0, Math.min(
-                    intent.getIntExtra(EXTRA_LIBRARY_POSITION, 0), activeQueue.size() - 1));
-            isLocal = activeQueue.get(position).local;
-            if (isLocal) {
-                localQueue.clear();
-                localQueue.addAll(activeQueue);
-            } else {
-                onlineQueue.clear();
-                onlineQueue.addAll(activeQueue);
-            }
-            openQueueTrack(position, true);
+        Bundle page = new Bundle();
+        page.putStringArrayList("names", names); page.putStringArrayList("artists", artists);
+        page.putInt("offset", offset); page.putInt("total", activeQueue.size());
+        page.putInt("current", currentPosition); page.putLong("version", queueVersion);
+        return page;
+    }
+
+    private static String queueLabel(String value) {
+        // UI pages never ship URLs/artwork/lyrics or arbitrarily large server labels through Binder.
+        return value == null ? "" : value.substring(0, Math.min(256, value.length()));
+    }
+
+    private boolean validQueueIndex(int index, long version) {
+        return version == queueVersion && index >= 0 && index < activeQueue.size();
+    }
+
+    private boolean moveQueueItem(int from, int to, long version) {
+        if (!validQueueIndex(from, version) || to < 0 || to >= activeQueue.size()) return false;
+        if (from == to) return true;
+        storage.cancelPending();
+        QueueItem current = currentPosition >= 0 ? activeQueue.get(currentPosition) : null;
+        activeQueue.add(to, activeQueue.remove(from));
+        // Object identity, not URL: the same recording may legitimately appear more than once.
+        currentPosition = current == null ? -1 : activeQueue.indexOf(current);
+        queueVersion++;
+        queuesDirty = true;
+        savePlaybackState();
+        return true;
+    }
+
+    private boolean removeQueueItem(int index, long version) {
+        if (!validQueueIndex(index, version)) return false;
+        storage.cancelPending();
+        boolean shouldPlay = isPlaying() || (preparing && playWhenPrepared);
+        activeQueue.remove(index);
+        queueVersion++;
+        queuesDirty = true;
+        if (activeQueue.isEmpty()) {
+            clearPlaybackQueue();
+        } else if (index == currentPosition) {
+            resumeOnFocusGain = false;
+            openQueueTrack(Math.min(index, activeQueue.size() - 1), shouldPlay);
+        } else {
+            if (index < currentPosition) currentPosition--;
+            savePlaybackState();
         }
+        return true;
+    }
+
+    private void clearPlaybackQueue() {
+        storage.cancelPending();
+        loadGeneration++;
+        restoring = false;
+        activeQueue.clear();
+        currentPosition = -1;
+        currentSource = null;
+        currentTrackName = getString(R.string.queue_empty);
+        currentTrackArtist = "";
+        isLocal = false;
+        playWhenPrepared = false;
+        resumeOnFocusGain = false;
+        prepared = false;
+        preparing = false;
+        pendingSeekPosition = 0;
+        playbackError = "";
+        mediaPlayer.reset();
+        abandonAudioFocus();
+        queueVersion++;
+        queuesDirty = true;
+        updateMetadata();
+        updatePlaybackState(PlaybackStateCompat.STATE_STOPPED);
+        notifyTrackChanged();
+        notifyPlayingState(false);
+        savePlaybackState();
     }
 
     private void setSleepTimer(long delayMs) {
@@ -630,6 +709,8 @@ public class MusicService extends Service {
         if (remaining > 0) {
             mainHandler.postDelayed(sleepTimer, remaining);
         } else if (endTime > 0) {
+            // Initial disk restoration has not started audio yet; a fresh explicit play may follow.
+            restorePlayOverride = false;
             getSharedPreferences(SLEEP_PREFERENCES, MODE_PRIVATE).edit()
                     .remove(KEY_SLEEP_END).apply();
         }
@@ -673,8 +754,17 @@ public class MusicService extends Service {
     }
 
     private void notifyTrackChanged() {
-        broadcastCallback(callback -> callback.trackChanged(currentSource,
-                currentTrackName, currentTrackArtist, isLocal), "notify track change");
+        MusicTrackEntity track = selectedTrack();
+        broadcastCallback(callback -> callback.trackChanged(track), "notify track change");
+    }
+
+    private MusicTrackEntity selectedTrack() {
+        if (currentPosition < 0 || currentPosition >= activeQueue.size()) return null;
+        QueueItem item = activeQueue.get(currentPosition);
+        if (item.metadata != null) return item.metadata;
+        MusicTrackEntity legacy = new MusicTrackEntity();
+        legacy.source = item.source; legacy.name = item.name; legacy.artist = item.artist; legacy.local = item.local;
+        return legacy;
     }
 
     private void broadcastCallback(CallbackAction action, String operation) {
@@ -706,6 +796,7 @@ public class MusicService extends Service {
     }
 
     private void updatePlaybackState(int state) {
+        playbackState = state;
         long actions = PlaybackStateCompat.ACTION_PLAY
                 | PlaybackStateCompat.ACTION_PAUSE
                 | PlaybackStateCompat.ACTION_PLAY_PAUSE
@@ -794,118 +885,80 @@ public class MusicService extends Service {
         return TextUtils.isEmpty(value) || "<unknown>".equals(value) ? fallback : value;
     }
 
-    private void setOnlineQueue(List<String> urls, List<String> names,
-                                List<String> artists, int selectedIndex) {
-        onlineQueue.clear();
-        if (urls == null) {
-            return;
-        }
-        for (int i = 0; i < urls.size(); i++) {
-            String source = urls.get(i);
-            if (TextUtils.isEmpty(source)) {
-                continue;
-            }
-            String name = names != null && i < names.size() ? names.get(i) : null;
-            String artist = artists != null && i < artists.size() ? artists.get(i) : null;
-            onlineQueue.add(new QueueItem(source,
-                    safeText(name, getString(R.string.unknown_music)),
-                    safeText(artist, getString(R.string.unknown_singer)), false));
-        }
-        if (!isLocal || TextUtils.isEmpty(currentSource)) {
-            activeQueue.clear();
-            activeQueue.addAll(onlineQueue);
-            if (activeQueue.isEmpty()) {
-                currentPosition = -1;
-            } else if (TextUtils.isEmpty(currentSource)) {
-                currentPosition = Math.max(0, Math.min(selectedIndex, activeQueue.size() - 1));
-            } else {
-                int matching = findQueueIndex(activeQueue, currentSource);
-                currentPosition = matching >= 0 ? matching
-                        : Math.max(0, Math.min(selectedIndex, activeQueue.size() - 1));
-            }
-        }
-    }
-
     private void savePlaybackState() {
-        getSharedPreferences(STATE_PREFERENCES, MODE_PRIVATE).edit()
-                .putString(KEY_LOCAL_QUEUE, serializeQueue(localQueue))
-                .putString(KEY_ONLINE_QUEUE, serializeQueue(onlineQueue))
-                .putBoolean(KEY_ACTIVE_LOCAL, isLocal)
-                .putInt(KEY_INDEX, currentPosition)
-                .putInt(KEY_POSITION, (int) currentPlaybackPosition())
-                .putInt(KEY_MODE, playMode)
-                .putBoolean(KEY_PLAYING, isPlaying())
-                .apply();
-    }
-
-    private void restorePlaybackState() {
-        SharedPreferences preferences = getSharedPreferences(STATE_PREFERENCES, MODE_PRIVATE);
-        playMode = PlaybackModeNavigator.normalizeMode(preferences.getInt(KEY_MODE,
-                PlaybackModeNavigator.SEQUENTIAL));
-        try {
-            deserializeQueue(preferences.getString(KEY_LOCAL_QUEUE, null), localQueue);
-            deserializeQueue(preferences.getString(KEY_ONLINE_QUEUE, null), onlineQueue);
-            isLocal = preferences.getBoolean(KEY_ACTIVE_LOCAL, false);
-            activeQueue.addAll(isLocal ? localQueue : onlineQueue);
-            int index = preferences.getInt(KEY_INDEX, -1);
-            if (index >= 0 && index < activeQueue.size()) {
-                currentPosition = index;
-                QueueItem item = activeQueue.get(index);
-                currentSource = item.source;
-                currentTrackName = item.name;
-                currentTrackArtist = item.artist;
-                prepareSource(currentSource, preferences.getBoolean(KEY_PLAYING, false),
-                        preferences.getInt(KEY_POSITION, 0));
+        if (restoring) return; // An early stop/pause must not overwrite a queue still being read.
+        PlaybackStorage.State state = new PlaybackStorage.State();
+        if (queuesDirty) state.queue = new ArrayList<>(activeQueue);
+        queuesDirty = false;
+        state.key = currentPosition >= 0 && currentPosition < activeQueue.size() ? activeQueue.get(currentPosition).key() : null;
+        state.source = currentSource; state.local = isLocal; state.index = currentPosition;
+        state.position = prepared ? (int) currentPlaybackPosition() : pendingSeekPosition;
+        state.mode = playMode; state.playing = isPlaying() || (preparing && playWhenPrepared);
+        storage.save(state, appliedRequestId, saved -> {
+            if (!saved) {
+                queuesDirty = true;
+                if (!destroyed && !persistenceFailed) android.widget.Toast.makeText(this,
+                        R.string.playback_save_failed, android.widget.Toast.LENGTH_LONG).show();
             }
-        } catch (RuntimeException error) {
-            Log.w(TAG, "Ignoring invalid saved playback queue", error);
-            activeQueue.clear();
-        }
+            persistenceFailed = !saved;
+        });
     }
 
-    private String serializeQueue(List<QueueItem> items) {
-        return PlaybackQueueCodec.encode(items);
-    }
-
-    private static void deserializeQueue(String json, List<QueueItem> output) {
-        for (PlaybackQueueCodec.Item item : PlaybackQueueCodec.decode(json)) {
-            if (!TextUtils.isEmpty(item.source)) {
-                output.add(new QueueItem(item.source, item.name, item.artist, item.local));
+    private void loadPlayback(String requestId) {
+        long generation = ++loadGeneration;
+        if (requestId != null) restorePlayOverride = null;
+        storage.load(requestId, restoring, (state, request, error) -> {
+            if (destroyed || generation != loadGeneration) return;
+            boolean initialRestore = restoring;
+            restoring = false;
+            if (initialRestore && !modeChangedDuringRestore) playMode = PlaybackModeNavigator.normalizeMode(state.mode);
+            if (request != null && storage.isCurrent(request.id)) {
+                playLibraryQueue(request, restorePlayOverride == null || restorePlayOverride);
+            } else if (initialRestore) {
+                activeQueue.clear();
+                for (PlaybackQueueCodec.Item item : state.queue) {
+                    QueueItem restored = new QueueItem(item.source, item.name, item.artist, item.local);
+                    restored.metadata = item.metadata;
+                    activeQueue.add(restored);
+                }
+                queueVersion++;
+                int index = state.index;
+                String identity = state.key != null ? state.key : state.source;
+                boolean useKey = state.key != null;
+                if (identity != null && (index < 0 || index >= activeQueue.size()
+                        || !TextUtils.equals(useKey ? activeQueue.get(index).key() : activeQueue.get(index).source, identity)))
+                    index = findQueueIndex(activeQueue, identity, useKey);
+                if (index >= 0 && index < activeQueue.size()) {
+                    currentPosition = index;
+                    QueueItem item = activeQueue.get(index);
+                    isLocal = item.local; currentSource = item.source;
+                    currentTrackName = item.name; currentTrackArtist = item.artist;
+                    MusicLibraryRepository.get(this).saveMetadata(item.metadata);
+                    notifyTrackChanged();
+                    prepareSource(currentSource, restorePlayOverride != null ? restorePlayOverride : state.playing, state.position);
+                }
+                savePlaybackState();
             }
-        }
+            if (error != null) android.widget.Toast.makeText(this, R.string.queue_load_failed,
+                    android.widget.Toast.LENGTH_LONG).show();
+        });
     }
 
-    private void rebuildLocalQueue() {
-        localQueue.clear();
-        if (music == null) {
-            return;
-        }
-        for (SongModel song : music) {
-            localQueue.add(new QueueItem(song.getPath(),
-                    safeText(song.getSong(), getString(R.string.unknown_music)),
-                    safeText(song.getSinger(), getString(R.string.unknown_singer)), true));
-        }
-        if (isLocal && !TextUtils.isEmpty(currentSource)) {
-            activeQueue.clear();
-            activeQueue.addAll(localQueue);
-            int matching = findQueueIndex(activeQueue, currentSource);
-            if (matching >= 0) {
-                currentPosition = matching;
-            }
-        }
-        savePlaybackState();
-    }
-
-    private static int findQueueIndex(List<QueueItem> queue, String source) {
+    private static int findQueueIndex(List<QueueItem> queue, String source, boolean useKey) {
         for (int i = 0; i < queue.size(); i++) {
-            if (source.equals(queue.get(i).source)) {
+            if (source.equals(useKey ? queue.get(i).key() : queue.get(i).source)) {
                 return i;
             }
         }
         return -1;
     }
 
-    private static final class QueueItem extends PlaybackQueueCodec.Item {
+    private final class QueueItem extends PlaybackQueueCodec.Item {
+        QueueItem(MusicTrackEntity track) {
+            this(track.getPlaybackUrl(), safeText(track.name, getString(R.string.unknown_music)),
+                    safeText(track.artist, getString(R.string.unknown_singer)), track.local);
+            metadata = track;
+        }
         QueueItem(String source, String name, String artist, boolean local) {
             super(source, name, artist, local);
         }
@@ -925,6 +978,7 @@ public class MusicService extends Service {
     @Override
     public void onDestroy() {
         savePlaybackState();
+        destroyed = true;
         mainHandler.removeCallbacksAndMessages(null);
         unregisterReceiver(noisyReceiver);
         abandonAudioFocus();
@@ -959,37 +1013,24 @@ public class MusicService extends Service {
     }
 
     private final MusicAidlInterface.Stub stub = new MusicAidlInterface.Stub() {
-        @Override
-        public void openAudio(int position) {
-            openLocalTrack(position);
+        @Override public Bundle getQueuePage(int offset) { return queuePage(offset); }
+        @Override public long getQueueVersion() { return queueVersion; }
+        @Override public boolean playQueueItem(int index, long version) {
+            if (!validQueueIndex(index, version)) return false;
+            storage.cancelPending();
+            openQueueTrack(index, true);
+            return true;
         }
-
-        @Override
-        public void playAudio(String url, String name, String artist) {
-            isLocal = false;
-            currentMusic = null;
-            currentTrackName = safeText(name, getString(R.string.unknown_music));
-            currentTrackArtist = safeText(artist, getString(R.string.unknown_singer));
-            currentSource = url;
-            activeQueue.clear();
-            activeQueue.addAll(onlineQueue);
-            currentPosition = findQueueIndex(activeQueue, url);
-            if (currentPosition < 0) {
-                QueueItem item = new QueueItem(url, currentTrackName, currentTrackArtist, false);
-                onlineQueue.add(item);
-                activeQueue.add(item);
-                currentPosition = activeQueue.size() - 1;
-            }
-            notifyTrackChanged();
-            MusicLibraryRepository.get(MusicService.this).recordPlayback(url,
-                    currentTrackName, currentTrackArtist, false);
-            playMusic(url);
+        @Override public boolean moveQueueItem(int from, int to, long version) {
+            return MusicService.this.moveQueueItem(from, to, version);
         }
-
-        @Override
-        public void setOnlineQueue(List<String> urls, List<String> names,
-                                   List<String> artists, int currentIndex) {
-            MusicService.this.setOnlineQueue(urls, names, artists, currentIndex);
+        @Override public boolean removeQueueItem(int index, long version) {
+            return MusicService.this.removeQueueItem(index, version);
+        }
+        @Override public boolean clearQueue(long version) {
+            if (version != queueVersion) return false;
+            clearPlaybackQueue();
+            return true;
         }
 
         @Override
@@ -1010,6 +1051,16 @@ public class MusicService extends Service {
         @Override
         public boolean isPlay() {
             return isPlaying();
+        }
+
+        @Override
+        public int getPlaybackState() {
+            return playbackState;
+        }
+
+        @Override
+        public String getPlaybackError() {
+            return playbackError;
         }
 
         @Override
@@ -1034,6 +1085,7 @@ public class MusicService extends Service {
 
         @Override
         public void seekPlayMode(int mode) {
+            modeChangedDuringRestore = true;
             playMode = PlaybackModeNavigator.normalizeMode(mode);
             savePlaybackState();
         }

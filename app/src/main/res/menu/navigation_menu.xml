@@ -28,6 +28,10 @@
         android:id="@+id/action_search_music"
         android:icon="@drawable/ic_menu_search"
         android:title="@string/search_music" />
+    <item android:id="@+id/action_floating_control" android:checkable="true"
+        android:icon="@drawable/ic_menu_settings" android:title="@string/floating_control" />
+    <item android:id="@+id/action_notification_permission"
+        android:icon="@drawable/ic_menu_settings" android:title="@string/notification_settings" />
     <group android:checkableBehavior="single">
         <item
             android:id="@+id/action_setting"

@@ -10,9 +10,13 @@ android {
         applicationId = 'com.chao.peakmusic'
         minSdk = 21
         targetSdk = 37
-        versionCode = 1
-        versionName = '1.0'
-        testInstrumentationRunner = 'androidx.test.runner.AndroidJUnitRunner'
+        testInstrumentationRunner = providers.gradleProperty('platformReleaseSmoke').getOrElse('false').toBoolean()
+                ? 'com.chao.peakmusic.ReleaseQueueInstrumentation' : 'androidx.test.runner.AndroidJUnitRunner'
+        javaCompileOptions {
+            annotationProcessorOptions {
+                arguments += ['room.schemaLocation': "$projectDir/schemas".toString()]
+            }
+        }
     }
     buildTypes {
         release {
@@ -33,7 +37,15 @@ android {
     lint {
         disable += 'NotificationPermission'
     }
+    sourceSets {
+        test.resources.srcDir 'schemas'
+    }
+    testOptions {
+        unitTests.includeAndroidResources = true
+    }
 }
+
+apply from: rootProject.file('gradle/release-config.gradle')
 
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
@@ -52,6 +64,7 @@ dependencies {
     //noinspection GradleDependency
     annotationProcessor 'androidx.room:room-compiler:2.7.2'
     testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.robolectric:robolectric:4.16.1'
     androidTestImplementation 'androidx.test.ext:junit:1.3.0'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.7.0'
     //noinspection GradleDependency -- Material 1.14 raises minSdk to 23.

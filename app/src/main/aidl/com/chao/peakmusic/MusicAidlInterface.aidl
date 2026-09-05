@@ -1,21 +1,18 @@
 // TestAidlInterface.aidl
 package com.chao.peakmusic;
 import com.chao.peakmusic.ActivityCall;
+import android.os.Bundle;
 // Declare any non-default types here with import statements
 
 interface MusicAidlInterface {
 
-  /**
-      * 打开一个音频文件
-      */
-      void openAudio(int position);
-  /**
-      * 打开一个音频文件
-      */
-      void playAudio(String url, String name, String artist);
-
-      void setOnlineQueue(in List<String> urls, in List<String> names,
-                          in List<String> artists, int currentIndex);
+      // Bounded page: names/artists (at most 100), offset, total, current, version.
+      Bundle getQueuePage(int offset);
+      long getQueueVersion();
+      boolean playQueueItem(int index, long version);
+      boolean moveQueueItem(int from, int to, long version);
+      boolean removeQueueItem(int index, long version);
+      boolean clearQueue(long version);
 
      /**
       * 播放
@@ -36,6 +33,10 @@ interface MusicAidlInterface {
       * 是否播放中
       */
       boolean isPlay();
+
+      int getPlaybackState();
+
+      String getPlaybackError();
 
      /**
       * 获取歌曲时长

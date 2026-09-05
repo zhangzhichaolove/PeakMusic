@@ -4,6 +4,7 @@ package com.chao.peakmusic.base;
  * Created by Chao  2018/3/9 on 11:48
  * description
  */
+@androidx.annotation.Keep
 public class HttpResult<T> {
     private boolean success;
     private String msg;

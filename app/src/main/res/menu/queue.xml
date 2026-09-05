@@ -1,0 +1,4 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/action_queue_current" android:title="@string/queue_show_current" />
+    <item android:id="@+id/action_queue_clear" android:title="@string/queue_clear" />
+</menu>

@@ -9,3 +9,14 @@
 .externalNativeBuild
 .idea
 app/release
+
+# Local signing credentials never belong in source control.
+*.jks
+*.keystore
+*.p12
+*.pfx
+keystore.properties
+.env
+.env.*
+__pycache__/
+*.pyc

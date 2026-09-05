@@ -4,6 +4,7 @@ import androidx.room.Dao;
 import androidx.room.Insert;
 import androidx.room.OnConflictStrategy;
 import androidx.room.Query;
+import androidx.room.Upsert;
 
 import java.util.List;
 
@@ -12,7 +13,7 @@ public interface MusicLibraryDao {
     @Query("SELECT * FROM music_tracks WHERE source = :source LIMIT 1")
     MusicTrackEntity findTrack(String source);
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     void saveTrack(MusicTrackEntity track);
 
     @Query("SELECT * FROM music_tracks WHERE favorite = 1 ORDER BY favoriteAt DESC")
@@ -44,6 +45,12 @@ public interface MusicLibraryDao {
 
     @Query("DELETE FROM playlist_tracks WHERE playlistId = :playlistId")
     void deletePlaylistTracks(long playlistId);
+
+    @Query("SELECT COUNT(*) FROM playlists WHERE id = :playlistId")
+    int hasPlaylist(long playlistId);
+
+    @Query("UPDATE playlists SET name = :name WHERE id = :playlistId")
+    int renamePlaylist(long playlistId, String name);
 
     @Query("DELETE FROM playlists WHERE id = :playlistId")
     void deletePlaylist(long playlistId);

@@ -51,8 +51,9 @@ public final class MusicActions {
             } else {
                 actions.add(activity.getString(R.string.download_music));
             }
+            actions.add(activity.getString(R.string.queue_play_next));
             new AlertDialog.Builder(activity)
-                    .setTitle(track.name)
+                    .setTitle(track.name + "\n" + MusicSourceLabels.label(activity, track))
                     .setItems(actions.toArray(new String[0]), (dialog, which) -> {
                         if (which == 0) {
                             showDetails(activity, track);
@@ -68,6 +69,9 @@ public final class MusicActions {
                             copyAddress(activity, track);
                         } else if (which == 4) {
                             share(activity, track);
+                        } else if (which == 6) {
+                            com.chao.peakmusic.service.PlaybackStorage.get(activity).playNext(track);
+                            ToastUtils.showToast(activity.getString(R.string.queue_added_next));
                         } else if (track.local) {
                             openLocalFile(activity, track);
                         } else {
@@ -86,7 +90,7 @@ public final class MusicActions {
                 safe(track.filePath))
                 : activity.getString(R.string.online_music_details, safe(track.name),
                 safe(track.artist), safe(track.imageUrl), safe(track.lyricsUrl),
-                safe(track.source));
+                safe(track.getPlaybackUrl()));
         AlertDialog dialog = new AlertDialog.Builder(activity)
                 .setTitle(R.string.music_details)
                 .setMessage(message)
@@ -109,9 +113,9 @@ public final class MusicActions {
                     .setTitle(R.string.choose_playlist)
                     .setItems(names, (dialog, which) -> {
                         PlaylistSummary playlist = playlists.get(which);
-                        repository.addToPlaylist(playlist.id, track, () ->
-                                ToastUtils.showToast(activity.getString(
-                                        R.string.added_to_playlist, playlist.name)));
+                        repository.addToPlaylist(playlist.id, track, added ->
+                                ToastUtils.showToast(added ? activity.getString(R.string.added_to_playlist, playlist.name)
+                                        : activity.getString(R.string.library_write_failed)));
                     })
                     .show();
         });
@@ -119,7 +123,7 @@ public final class MusicActions {
 
     private static void copyAddress(Activity activity, MusicTrackEntity track) {
         String address = track.local && !TextUtils.isEmpty(track.filePath)
-                ? track.filePath : track.source;
+                ? track.filePath : track.getPlaybackUrl();
         ClipboardManager manager = (ClipboardManager)
                 activity.getSystemService(Context.CLIPBOARD_SERVICE);
         manager.setPrimaryClip(ClipData.newPlainText(activity.getString(
@@ -129,7 +133,7 @@ public final class MusicActions {
 
     private static void share(Activity activity, MusicTrackEntity track) {
         String address = track.local && !TextUtils.isEmpty(track.filePath)
-                ? track.filePath : track.source;
+                ? track.filePath : track.getPlaybackUrl();
         Intent intent = new Intent(Intent.ACTION_SEND)
                 .setType("text/plain")
                 .putExtra(Intent.EXTRA_SUBJECT, track.name)
@@ -141,7 +145,7 @@ public final class MusicActions {
     private static void openLocalFile(Activity activity, MusicTrackEntity track) {
         try {
             Intent intent = new Intent(Intent.ACTION_VIEW)
-                    .setDataAndType(Uri.parse(track.source), "audio/*")
+                    .setDataAndType(Uri.parse(track.getPlaybackUrl()), "audio/*")
                     .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             activity.startActivity(intent);
         } catch (RuntimeException error) {
@@ -161,7 +165,7 @@ public final class MusicActions {
         }
         try {
             String fileName = sanitize(track.name + "-" + track.artist) + ".mp3";
-            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(track.source))
+            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(track.getPlaybackUrl()))
                     .setTitle(track.name)
                     .setDescription(track.artist)
                     .setNotificationVisibility(

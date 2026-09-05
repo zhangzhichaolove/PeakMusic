@@ -33,11 +33,15 @@ final class PlaybackQueueCodec {
         }
     }
 
+    @androidx.annotation.Keep
     static class Item {
+        com.chao.peakmusic.data.MusicTrackEntity metadata;
         String source;
         String name;
         String artist;
         boolean local;
+
+        String key() { return metadata == null ? source : metadata.source; }
 
         Item(String source, String name, String artist, boolean local) {
             this.source = source;

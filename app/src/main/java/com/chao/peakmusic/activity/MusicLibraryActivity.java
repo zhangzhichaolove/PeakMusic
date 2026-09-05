@@ -15,7 +15,6 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
-import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.ListAdapter;
@@ -27,7 +26,6 @@ import com.chao.peakmusic.data.MusicLibraryRepository;
 import com.chao.peakmusic.data.MusicTrackEntity;
 import com.chao.peakmusic.data.PlaylistSummary;
 import com.chao.peakmusic.databinding.ItemPlaylistBinding;
-import com.chao.peakmusic.service.MusicService;
 import com.chao.peakmusic.utils.BarUtils;
 import com.chao.peakmusic.utils.MusicActions;
 import com.chao.peakmusic.utils.ToastUtils;
@@ -50,6 +48,8 @@ public class MusicLibraryActivity extends AppCompatActivity {
     private String mode;
     private long selectedPlaylistId = -1;
     private String selectedPlaylistName;
+    private int requestGeneration;
+    private LibrarySelection selection;
 
     public static Intent intent(Context context, String mode) {
         return new Intent(context, MusicLibraryActivity.class).putExtra(EXTRA_MODE, mode);
@@ -62,8 +62,9 @@ public class MusicLibraryActivity extends AppCompatActivity {
         setContentView(R.layout.activity_music_library);
         mode = getIntent().getStringExtra(EXTRA_MODE);
         repository = MusicLibraryRepository.get(this);
+        selection = new androidx.lifecycle.ViewModelProvider(this).get(LibrarySelection.class);
         toolbar = findViewById(R.id.library_toolbar);
-        BarUtils.applyTopInset(toolbar);
+        BarUtils.applyPageInsets(findViewById(android.R.id.content), toolbar);
         list = findViewById(R.id.library_list);
         emptyView = findViewById(R.id.library_empty);
         setSupportActionBar(toolbar);
@@ -77,7 +78,21 @@ public class MusicLibraryActivity extends AppCompatActivity {
                 handleBack();
             }
         });
-        showRoot();
+        if (savedInstanceState != null) {
+            selectedPlaylistId = savedInstanceState.getLong("playlist_id", -1);
+            selectedPlaylistName = savedInstanceState.getString("playlist_name");
+        }
+        if (selectedPlaylistId >= 0) {
+            setTitle(selectedPlaylistName); toolbar.setTitle(selectedPlaylistName);
+            loadPlaylistTracks();
+        } else showRoot();
+        selection.changes.observe(this, ignored -> selectionChanged());
+    }
+
+    @Override protected void onSaveInstanceState(android.os.Bundle state) {
+        state.putLong("playlist_id", selectedPlaylistId);
+        state.putString("playlist_name", selectedPlaylistName);
+        super.onSaveInstanceState(state);
     }
 
     @Override
@@ -105,21 +120,44 @@ public class MusicLibraryActivity extends AppCompatActivity {
 
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        if (selection.busy) { ToastUtils.showToast(getString(R.string.batch_processing)); return true; }
+        int action = item.getItemId();
+        if (action == R.id.action_select_tracks) { selection.start(); return true; }
+        if (action == R.id.action_cancel_selection) { selection.clear(); return true; }
+        if (action == R.id.action_select_all_tracks) {
+            if (selection.keys.size() == trackAdapter.getItemCount()) selection.keys.clear();
+            else for (MusicTrackEntity track : trackAdapter.getCurrentList()) selection.keys.add(track.source);
+            selection.changed(); return true;
+        }
+        if (action == R.id.action_batch_playlist) { chooseBatchPlaylist(); return true; }
+        if (action == R.id.action_batch_favorite) { favoriteBatch(); return true; }
+        if (action == R.id.action_batch_remove) { removeBatch(); return true; }
         if (item.getItemId() == R.id.action_new_playlist) {
             showCreatePlaylistDialog();
             return true;
         }
+        if (item.getItemId() == R.id.action_rename_playlist && selectedPlaylistId >= 0) {
+            showRenamePlaylistDialog();
+            return true;
+        }
         if (item.getItemId() == R.id.action_clear_music_history) {
-            repository.clearHistory(this::showRoot);
+            new AlertDialog.Builder(this).setMessage(R.string.clear_history_confirm)
+                    .setNegativeButton(R.string.cancel, null)
+                    .setPositiveButton(R.string.clear, (dialog, which) -> repository.clearHistory(success -> {
+                        if (success) showRoot(); else ToastUtils.showToast(getString(R.string.library_write_failed));
+                    })).show();
             return true;
         }
         if (item.getItemId() == R.id.action_delete_playlist && selectedPlaylistId >= 0) {
+            long deletingId = selectedPlaylistId;
             new AlertDialog.Builder(this)
                     .setTitle(R.string.delete_playlist)
                     .setMessage(getString(R.string.delete_playlist_confirm, selectedPlaylistName))
                     .setNegativeButton(R.string.cancel, null)
                     .setPositiveButton(R.string.delete, (dialog, which) ->
-                            repository.deletePlaylist(selectedPlaylistId, () -> {
+                            repository.deletePlaylist(deletingId, success -> {
+                                if (isDestroyed() || selectedPlaylistId != deletingId) return;
+                                if (!success) { ToastUtils.showToast(getString(R.string.library_write_failed)); return; }
                                 selectedPlaylistId = -1;
                                 selectedPlaylistName = null;
                                 showRoot();
@@ -132,18 +170,23 @@ public class MusicLibraryActivity extends AppCompatActivity {
     }
 
     private void showRoot() {
+        if (isDestroyed()) return;
+        int request = ++requestGeneration;
         selectedPlaylistId = -1;
         selectedPlaylistName = null;
         invalidateOptionsMenu();
         if (MODE_HISTORY.equals(mode)) {
+            setTitle(R.string.recently_played);
             toolbar.setTitle(R.string.recently_played);
-            repository.loadHistory(this::showTracks);
+            repository.loadHistory(tracks -> { if (!isDestroyed() && request == requestGeneration) showTracks(tracks); });
         } else if (MODE_PLAYLISTS.equals(mode)) {
+            setTitle(R.string.playlists);
             toolbar.setTitle(R.string.playlists);
-            repository.loadPlaylists(this::showPlaylists);
+            repository.loadPlaylists(playlists -> { if (!isDestroyed() && request == requestGeneration) showPlaylists(playlists); });
         } else {
+            setTitle(R.string.music_favorites);
             toolbar.setTitle(R.string.music_favorites);
-            repository.loadFavorites(this::showTracks);
+            repository.loadFavorites(tracks -> { if (!isDestroyed() && request == requestGeneration) showTracks(tracks); });
         }
     }
 
@@ -153,14 +196,16 @@ public class MusicLibraryActivity extends AppCompatActivity {
             trackAdapter.setListener(new MusicLibraryAdapter.Listener() {
                 @Override
                 public void onClick(int position, MusicTrackEntity track) {
-                    ArrayList<MusicTrackEntity> queue = new ArrayList<>(trackAdapter.getCurrentList());
-                    Intent intent = MusicService.createQueueIntent(
-                            MusicLibraryActivity.this, queue, position);
-                    ContextCompat.startForegroundService(MusicLibraryActivity.this, intent);
+                    if (selection.busy) return;
+                    if (selection.active) { selection.toggle(track.source); return; }
+                    com.chao.peakmusic.service.PlaybackStorage.get(MusicLibraryActivity.this)
+                            .play(trackAdapter.getCurrentList(), position);
                 }
 
                 @Override
                 public void onLongClick(int position, MusicTrackEntity track) {
+                    if (selection.busy) return;
+                    if (selection.active) { selection.toggle(track.source); return; }
                     if (selectedPlaylistId >= 0) {
                         new AlertDialog.Builder(MusicLibraryActivity.this)
                                 .setTitle(track.name)
@@ -184,7 +229,14 @@ public class MusicLibraryActivity extends AppCompatActivity {
             });
         }
         list.setAdapter(trackAdapter);
-        trackAdapter.submitList(new ArrayList<>(tracks));
+        int generation = requestGeneration;
+        trackAdapter.submitList(new ArrayList<>(tracks), () -> {
+            if (isDestroyed() || generation != requestGeneration || list.getAdapter() != trackAdapter) return;
+            java.util.Set<String> visible = new java.util.HashSet<>();
+            for (MusicTrackEntity track : tracks) visible.add(track.source);
+            selection.keys.retainAll(visible);
+            selection.changed();
+        });
         emptyView.setText(R.string.music_library_empty);
         emptyView.setVisibility(tracks.isEmpty() ? View.VISIBLE : View.GONE);
     }
@@ -197,18 +249,24 @@ public class MusicLibraryActivity extends AppCompatActivity {
         playlistAdapter.setItems(playlists);
         emptyView.setText(R.string.playlists_empty);
         emptyView.setVisibility(playlists.isEmpty() ? View.VISIBLE : View.GONE);
+        invalidateOptionsMenu();
     }
 
     private void openPlaylist(PlaylistSummary playlist) {
         selectedPlaylistId = playlist.id;
         selectedPlaylistName = playlist.name;
+        setTitle(playlist.name);
         toolbar.setTitle(playlist.name);
         invalidateOptionsMenu();
         loadPlaylistTracks();
     }
 
     private void loadPlaylistTracks() {
-        repository.loadPlaylistTracks(selectedPlaylistId, this::showTracks);
+        if (isDestroyed() || selectedPlaylistId < 0) return;
+        int request = ++requestGeneration;
+        repository.loadPlaylistTracks(selectedPlaylistId, tracks -> {
+            if (!isDestroyed() && request == requestGeneration) showTracks(tracks);
+        });
     }
 
     private void showCreatePlaylistDialog() {
@@ -229,7 +287,30 @@ public class MusicLibraryActivity extends AppCompatActivity {
                 .show();
     }
 
+    private void showRenamePlaylistDialog() {
+        long playlistId = selectedPlaylistId;
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setText(selectedPlaylistName);
+        input.selectAll();
+        AlertDialog dialog = new AlertDialog.Builder(this).setTitle(R.string.rename_playlist).setView(input)
+                .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.save, null).create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+            String name = input.getText().toString().trim();
+            if (name.isEmpty()) { input.setError(getString(R.string.playlist_name_required)); return; }
+            repository.renamePlaylist(playlistId, name, renamed -> {
+                if (isDestroyed() || !dialog.isShowing()) return;
+                if (!renamed) { input.setError(getString(R.string.library_write_failed)); return; }
+                dialog.dismiss();
+                if (playlistId == selectedPlaylistId) { selectedPlaylistName = name; setTitle(name); toolbar.setTitle(name); }
+            });
+        }));
+        dialog.show();
+    }
+
     private void handleBack() {
+        if (selection.busy) { ToastUtils.showToast(getString(R.string.batch_processing)); return; }
+        if (selection.active) { selection.clear(); return; }
         if (selectedPlaylistId >= 0) {
             showRoot();
         } else {
@@ -238,12 +319,92 @@ public class MusicLibraryActivity extends AppCompatActivity {
     }
 
     private void updateMenu(Menu menu) {
-        if (menu == null) return;
+        if (menu == null || selection == null) return;
+        boolean trackPage = !MODE_PLAYLISTS.equals(mode) || selectedPlaylistId >= 0;
+        boolean hasTracks = trackPage && list.getAdapter() == trackAdapter && trackAdapter != null && trackAdapter.getItemCount() > 0;
+        boolean active = selection.active;
+        boolean chosen = !selection.keys.isEmpty();
+        menu.findItem(R.id.action_select_tracks).setVisible(hasTracks && !active);
+        menu.findItem(R.id.action_select_all_tracks).setVisible(active && hasTracks).setEnabled(!selection.busy)
+                .setTitle(hasTracks && chosen && selection.keys.size() == trackAdapter.getItemCount() ? R.string.deselect_all_tracks : R.string.select_all_tracks);
+        menu.findItem(R.id.action_cancel_selection).setVisible(active).setEnabled(!selection.busy);
+        menu.findItem(R.id.action_batch_playlist).setVisible(active).setEnabled(chosen && !selection.busy);
+        menu.findItem(R.id.action_batch_favorite).setVisible(active).setEnabled(chosen && !selection.busy)
+                .setTitle(allSelectedFavorite() ? R.string.unfavorite_selected : R.string.favorite_selected);
+        menu.findItem(R.id.action_batch_remove).setVisible(active && selectedPlaylistId >= 0).setEnabled(chosen && !selection.busy);
         menu.findItem(R.id.action_new_playlist).setVisible(
-                MODE_PLAYLISTS.equals(mode) && selectedPlaylistId < 0);
+                MODE_PLAYLISTS.equals(mode) && selectedPlaylistId < 0 && !active);
         menu.findItem(R.id.action_clear_music_history).setVisible(
-                MODE_HISTORY.equals(mode));
-        menu.findItem(R.id.action_delete_playlist).setVisible(selectedPlaylistId >= 0);
+                MODE_HISTORY.equals(mode) && !active);
+        menu.findItem(R.id.action_rename_playlist).setVisible(selectedPlaylistId >= 0 && !active);
+        menu.findItem(R.id.action_delete_playlist).setVisible(selectedPlaylistId >= 0 && !active);
+    }
+
+    private void selectionChanged() {
+        Boolean result = selection.consumeResult();
+        if (result != null) {
+            ToastUtils.showToast(getString(result ? R.string.batch_complete : R.string.library_write_failed));
+            if (result) selection.clear();
+            if (selectedPlaylistId >= 0) loadPlaylistTracks(); else showRoot();
+        }
+        toolbar.setSubtitle(selection.busy ? getString(R.string.batch_processing)
+                : selection.active ? getString(R.string.selected_track_count, selection.keys.size()) : null);
+        if (trackAdapter != null) trackAdapter.setSelection(selection.active, selection.keys, selection.busy);
+        invalidateOptionsMenu();
+    }
+
+    private List<String> selectedKeys() {
+        List<String> keys = new ArrayList<>();
+        if (trackAdapter != null) for (MusicTrackEntity track : trackAdapter.getCurrentList())
+            if (selection.keys.contains(track.source)) keys.add(track.source);
+        return keys;
+    }
+
+    private boolean allSelectedFavorite() {
+        if (selection.keys.isEmpty() || trackAdapter == null) return false;
+        for (MusicTrackEntity track : trackAdapter.getCurrentList())
+            if (selection.keys.contains(track.source) && !track.favorite) return false;
+        return true;
+    }
+
+    private void favoriteBatch() {
+        List<String> keys = selectedKeys();
+        if (keys.isEmpty()) return;
+        boolean favorite = !allSelectedFavorite();
+        LibrarySelection operation = selection;
+        Runnable apply = () -> { operation.begin(); repository.setFavorites(keys, favorite, operation::complete); };
+        if (favorite) apply.run();
+        else new AlertDialog.Builder(this).setTitle(R.string.unfavorite_selected)
+                .setMessage(getString(R.string.batch_unfavorite_confirm, keys.size()))
+                .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.remove_favorite, (dialog, which) -> apply.run()).show();
+    }
+
+    private void removeBatch() {
+        List<String> keys = selectedKeys();
+        if (keys.isEmpty() || selectedPlaylistId < 0) return;
+        long playlistId = selectedPlaylistId;
+        LibrarySelection operation = selection;
+        new AlertDialog.Builder(this).setTitle(R.string.remove_selected_from_playlist)
+                .setMessage(getString(R.string.batch_remove_confirm, keys.size()))
+                .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.remove_from_playlist, (dialog, which) -> {
+                    operation.begin(); repository.removeTracksFromPlaylist(playlistId, keys, operation::complete);
+                }).show();
+    }
+
+    private void chooseBatchPlaylist() {
+        List<String> keys = selectedKeys();
+        if (keys.isEmpty()) return;
+        repository.loadPlaylists(playlists -> {
+            if (isDestroyed() || !selection.active || selection.busy || !keys.equals(selectedKeys())) return;
+            if (playlists.isEmpty()) { ToastUtils.showToast(getString(R.string.playlists_empty_create_first)); return; }
+            String[] names = new String[playlists.size()];
+            for (int i = 0; i < names.length; i++) names[i] = playlists.get(i).name;
+            LibrarySelection operation = selection;
+            new AlertDialog.Builder(this).setTitle(R.string.choose_playlist)
+                    .setItems(names, (dialog, which) -> {
+                        operation.begin(); repository.addTracksToPlaylist(playlists.get(which).id, keys, operation::complete);
+                    }).setNegativeButton(R.string.cancel, null).show();
+        });
     }
 
     private final class PlaylistAdapter extends ListAdapter<PlaylistSummary, PlaylistAdapter.Holder> {

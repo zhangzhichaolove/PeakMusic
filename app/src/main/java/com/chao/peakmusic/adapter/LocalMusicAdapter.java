@@ -56,8 +56,9 @@ public class LocalMusicAdapter extends ListAdapter<SongModel, LocalMusicAdapter.
     public void onBindViewHolder(@NonNull Holder holder, int position) {
         SongModel song = getItem(position);
         holder.title.setText(song.getSong());
-        holder.artist.setText("<unknown>".equals(song.getSinger())
-                ? song.getAlbum() : song.getSinger());
+        String artist = song.getSinger() == null ? "" : song.getSinger().trim();
+        holder.artist.setText(artist.isEmpty() || "<unknown>".equalsIgnoreCase(artist)
+                ? holder.itemView.getContext().getString(R.string.local_unknown_artist) : artist);
         Object cover = song.getAlbumId() > 0
                 ? ScanningUtils.getInstance(holder.itemView.getContext())
                 .getMediaStoreAlbumCoverUri(song.getAlbumId())

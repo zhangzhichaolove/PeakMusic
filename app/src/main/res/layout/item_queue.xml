@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="12dp">
+    <LinearLayout android:id="@+id/queue_track" android:layout_width="0dp"
+        android:layout_height="wrap_content" android:layout_weight="1" android:minHeight="64dp"
+        android:orientation="vertical" android:gravity="center_vertical" android:paddingVertical="8dp"
+        android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true">
+        <TextView android:id="@+id/queue_track_name" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:textSize="16sp"
+            android:textColor="?android:attr/textColorPrimary" />
+        <TextView android:id="@+id/queue_track_artist" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:textSize="14sp"
+            android:textColor="?android:attr/textColorSecondary" />
+    </LinearLayout>
+    <ImageButton android:id="@+id/queue_item_actions" android:layout_width="48dp"
+        android:layout_height="48dp" android:background="?attr/selectableItemBackgroundBorderless"
+        android:src="@drawable/ic_queue_more" android:contentDescription="@string/queue_item_actions" />
+</LinearLayout>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:background="?android:attr/colorBackground">
+    <androidx.appcompat.widget.Toolbar android:id="@+id/queue_toolbar"
+        android:layout_width="match_parent" android:layout_height="?attr/actionBarSize"
+        android:background="?attr/colorPrimary" android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar" />
+    <TextView android:id="@+id/queue_status" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:padding="12dp" android:gravity="center"
+        android:text="@string/queue_connecting" android:textColor="?android:attr/textColorSecondary"
+        android:accessibilityLiveRegion="polite" />
+    <androidx.recyclerview.widget.RecyclerView android:id="@+id/queue_list"
+        android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" />
+    <androidx.constraintlayout.widget.ConstraintLayout xmlns:app="http://schemas.android.com/apk/res-auto"
+        android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingHorizontal="12dp">
+        <Button android:id="@+id/queue_previous_page" android:layout_width="0dp"
+            android:layout_height="wrap_content" android:minWidth="0dp" android:minHeight="48dp"
+            android:text="@string/queue_previous_page" app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/queue_next_page" app:layout_constraintTop_toTopOf="parent" />
+        <Button android:id="@+id/queue_next_page" android:layout_width="0dp"
+            android:layout_height="wrap_content" android:minWidth="0dp" android:minHeight="48dp"
+            android:text="@string/queue_next_page" app:layout_constraintStart_toEndOf="@id/queue_previous_page"
+            app:layout_constraintEnd_toEndOf="parent" app:layout_constraintTop_toTopOf="parent" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</LinearLayout>

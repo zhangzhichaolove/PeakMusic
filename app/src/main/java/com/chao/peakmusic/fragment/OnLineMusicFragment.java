@@ -12,29 +12,26 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.chao.peakmusic.MainActivity;
 import com.chao.peakmusic.R;
 import com.chao.peakmusic.adapter.OnlineContentMusicAdapter;
-import com.chao.peakmusic.base.ApiRequest;
 import com.chao.peakmusic.base.ApiUrl;
 import com.chao.peakmusic.base.BaseFragment;
-import com.chao.peakmusic.base.HttpResult;
 import com.chao.peakmusic.base.ServiceFactory;
-import com.chao.peakmusic.model.MusicListModel;
 import com.chao.peakmusic.model.MusicModel;
-import com.chao.peakmusic.utils.LogUtils;
 import com.chao.peakmusic.utils.MusicDataUtils;
 import com.chao.peakmusic.utils.MusicActions;
 import com.chao.peakmusic.data.MusicTrackEntity;
 
 import java.util.List;
+import com.chao.peakmusic.catalog.MusicPageController;
+import com.chao.peakmusic.catalog.MusicPageFooter;
+import io.reactivex.rxjava3.schedulers.Schedulers;
+import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 
-import io.reactivex.rxjava3.core.Observer;
-import io.reactivex.rxjava3.disposables.Disposable;
 
 /**
  * Created by Chao on 2018-09-23.
  */
 
 public class OnLineMusicFragment extends BaseFragment {
-    RecyclerView musicTitle;
     RecyclerView musicContent;
     View stateContainer;
     ProgressBar stateProgress;
@@ -42,7 +39,8 @@ public class OnLineMusicFragment extends BaseFragment {
     Button stateRetry;
 
     private OnlineContentMusicAdapter contentMusicAdapter;
-    private Disposable currentRequest;
+    private MusicPageController pages;
+    private MusicPageFooter footer;
 
 
     public static OnLineMusicFragment newInstance() {
@@ -72,9 +70,7 @@ public class OnLineMusicFragment extends BaseFragment {
                 MusicModel musicModel = contentMusicAdapter.getData().get(position);
                 MainActivity activity = (MainActivity) getActivity();
                 if (activity != null) {
-                    activity.getListener().playMusic(musicModel.getMp3(),
-                            musicModel.getName(), musicModel.getSinger(),
-                            musicModel.getImg());
+                    activity.getListener().playMusic(musicModel);
                 }
                 MusicDataUtils.getInstance().setCurrentPosition(position);
             }
@@ -85,6 +81,14 @@ public class OnLineMusicFragment extends BaseFragment {
             }
         });
         stateRetry.setOnClickListener(view -> reloadMusic());
+        footer = new MusicPageFooter(rootView, () -> { if (pages != null) pages.loadNext(); });
+        musicContent.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override public void onScrolled(RecyclerView recycler, int dx, int dy) {
+                if (dy > 0 && ((LinearLayoutManager) recycler.getLayoutManager()).findLastVisibleItemPosition()
+                        >= contentMusicAdapter.getItemCount() - 4 && pages != null
+                        && pages.state() != MusicPageController.State.MORE_ERROR) pages.loadNext();
+            }
+        });
     }
 
     private void showMusicDetails(MusicModel music) {
@@ -100,42 +104,26 @@ public class OnLineMusicFragment extends BaseFragment {
         if (contentMusicAdapter == null) {
             return;
         }
-        if (currentRequest != null) {
-            currentRequest.dispose();
-        }
-        showLoading();
-        ApiRequest.obtain(ServiceFactory.getInstance().createService(ApiUrl.class).getMusicList(""), new Observer<HttpResult<MusicListModel>>() {
-            @Override
-            public void onSubscribe(Disposable d) {
-                currentRequest = d;
-                disposables.add(d);
-            }
+        if (pages != null) pages.close();
+        pages = new MusicPageController(ServiceFactory.getInstance().createService(ApiUrl.class),
+                Schedulers.io(), AndroidSchedulers.mainThread(), (state, songs) -> {
+                    contentMusicAdapter.setData(songs);
+                    MusicDataUtils.getInstance().setMusicList(songs);
+                    if (state == MusicPageController.State.LOADING) showLoading();
+                    else if (state == MusicPageController.State.ERROR) showError(null);
+                    else showContentState(songs);
+                    footer.render(pages);
+                });
+        pages.refresh("", 0);
+    }
 
-            @Override
-            public void onNext(HttpResult<MusicListModel> objectHttpResult) {
-                LogUtils.showTagE(objectHttpResult);
-                if (objectHttpResult == null || !objectHttpResult.isSuccess()
-                        || objectHttpResult.getResult() == null) {
-                    showError(objectHttpResult == null ? null : objectHttpResult.getMsg());
-                    return;
-                }
-                List<MusicModel> records = objectHttpResult.getResult().getRecords();
-                contentMusicAdapter.setData(records);
-                MusicDataUtils.getInstance().setMusicList(records);
-                showContentState(records);
-            }
-
-            @Override
-            public void onError(Throwable e) {
-                LogUtils.showTagE(e);
-                showError(e.getLocalizedMessage());
-            }
-
-            @Override
-            public void onComplete() {
-
-            }
-        });
+    @Override public void onDestroyView() {
+        if (pages != null) pages.close();
+        pages = null;
+        musicContent.setAdapter(null);
+        contentMusicAdapter = null;
+        footer = null;
+        super.onDestroyView();
     }
 
     private void showLoading() {

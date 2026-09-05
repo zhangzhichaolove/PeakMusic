@@ -7,11 +7,19 @@
     <color name="normalColor">#707070</color>
     <color name="red">#FF0000</color>
     <color name="gray_c">#CCCCCC</color>
-    <color name="text_main_color">#000033</color>
     <color name="white">#FFFFFF</color>
-    <color name="white_alpha">#EDFFFFFF</color>
     <color name="black">#000000</color>
-    <color name="lyric_active">#FF4081</color>
+    <color name="lyric_active">#C51162</color>
+    <color name="lyric_inactive">#616161</color>
     <color name="navigation_drawer_background">#FFFFFF</color>
     <color name="navigation_item_default">#DE000000</color>
+    <color name="diagnostic_action">#303F9F</color>
+    <color name="button_surface">#EEF0FF</color>
+    <color name="button_foreground">#344494</color>
+    <color name="button_outline">#D9DEF8</color>
+    <color name="button_primary_surface">#3F51B5</color>
+    <color name="button_primary_foreground">#FFFFFF</color>
+    <color name="button_ripple">#283F51B5</color>
+    <color name="button_disabled_surface">#E8E8EC</color>
+    <color name="button_disabled_foreground">#777780</color>
 </resources>

@@ -31,10 +31,8 @@ public class OnlineContentMusicAdapter extends ListAdapter<MusicModel, OnlineCon
             @Override
             public boolean areItemsTheSame(@NonNull MusicModel oldItem,
                                            @NonNull MusicModel newItem) {
-                if (oldItem.getId() > 0 || newItem.getId() > 0) {
-                    return oldItem.getId() == newItem.getId();
-                }
-                return Objects.equals(oldItem.getMp3(), newItem.getMp3());
+                return com.chao.peakmusic.data.MusicTrackEntity.keyOf(oldItem)
+                        .equals(com.chao.peakmusic.data.MusicTrackEntity.keyOf(newItem));
             }
 
             @Override

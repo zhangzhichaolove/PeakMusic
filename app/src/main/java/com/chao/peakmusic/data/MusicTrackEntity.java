@@ -2,6 +2,7 @@ package com.chao.peakmusic.data;
 
 import androidx.annotation.NonNull;
 import androidx.room.Entity;
+import androidx.room.ColumnInfo;
 import androidx.room.PrimaryKey;
 
 import com.chao.peakmusic.model.MusicModel;
@@ -12,9 +13,15 @@ import android.os.Parcelable;
 
 @Entity(tableName = "music_tracks")
 public class MusicTrackEntity implements Parcelable {
+    // Historical column name: source is the stable library key, NOT the playback URL.
     @PrimaryKey
     @NonNull
     public String source = "";
+    @NonNull @ColumnInfo(defaultValue = "'legacy'")
+    public String sourceId = MusicSource.LEGACY;
+    public String sourceBaseUrl;
+    public String mediaId;
+    public String playbackUrl;
     public String name;
     public String artist;
     public String imageUrl;
@@ -33,7 +40,11 @@ public class MusicTrackEntity implements Parcelable {
     public static MusicTrackEntity from(MusicModel music) {
         MusicTrackEntity result = new MusicTrackEntity();
         if (music != null) {
-            result.source = safe(music.getMp3());
+            result.source = keyOf(music);
+            result.sourceId = music.getSourceId();
+            result.sourceBaseUrl = music.getSourceBaseUrl();
+            result.mediaId = music.getId();
+            result.playbackUrl = music.getMp3();
             result.name = music.getName();
             result.artist = music.getSinger();
             result.imageUrl = music.getImg();
@@ -45,7 +56,9 @@ public class MusicTrackEntity implements Parcelable {
     public static MusicTrackEntity from(SongModel song) {
         MusicTrackEntity result = new MusicTrackEntity();
         if (song != null) {
-            result.source = safe(song.getPath());
+            result.source = safe(song.getPath()); // Preserve the MediaStore URI key and existing local memberships.
+            result.sourceId = MusicSource.LOCAL;
+            result.playbackUrl = song.getPath();
             result.name = song.getSong();
             result.artist = song.getSinger();
             result.local = true;
@@ -67,8 +80,20 @@ public class MusicTrackEntity implements Parcelable {
         result.setSinger(artist);
         result.setImg(imageUrl);
         result.setLrc(lyricsUrl);
-        result.setMp3(source);
+        result.setMp3(getPlaybackUrl());
+        result.setId(mediaId);
+        result.restoreLibrarySource(sourceId, sourceBaseUrl, source);
         return result;
+    }
+
+    public String getPlaybackUrl() { return playbackUrl == null ? source : playbackUrl; }
+
+    public static String keyOf(MusicModel music) {
+        if (music.getStoredLibraryKey() != null) return music.getStoredLibraryKey();
+        if (MusicSource.LEGACY.equals(music.getSourceId())) return safe(music.getMp3());
+        String id = music.getId();
+        return music.getSourceId() + (id == null || id.trim().isEmpty()
+                ? ":url:" + safe(music.getMp3()) : ":id:" + id.trim());
     }
 
     private static String safe(String value) {
@@ -94,6 +119,8 @@ public class MusicTrackEntity implements Parcelable {
         favoriteAt = in.readLong();
         lastPlayedAt = in.readLong();
         playCount = in.readInt();
+        sourceId = in.readString(); sourceBaseUrl = in.readString();
+        mediaId = in.readString(); playbackUrl = in.readString();
     }
 
     @Override
@@ -113,6 +140,8 @@ public class MusicTrackEntity implements Parcelable {
         dest.writeLong(favoriteAt);
         dest.writeLong(lastPlayedAt);
         dest.writeInt(playCount);
+        dest.writeString(sourceId); dest.writeString(sourceBaseUrl);
+        dest.writeString(mediaId); dest.writeString(playbackUrl);
     }
 
     @Override

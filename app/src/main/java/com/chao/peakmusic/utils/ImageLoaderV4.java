@@ -15,11 +15,15 @@ import com.bumptech.glide.request.RequestOptions;
 public class ImageLoaderV4 {
     private static ImageLoaderV4 instance;
     private RequestOptions options = new RequestOptions()
+            .placeholder(com.chao.peakmusic.R.drawable.default_cover)
+            .error(com.chao.peakmusic.R.drawable.default_cover)
             .centerCrop()
             .dontAnimate()
             .priority(Priority.HIGH)
             .diskCacheStrategy(DiskCacheStrategy.ALL);
     private RequestOptions optionsCircle = RequestOptions.circleCropTransform()
+            .placeholder(com.chao.peakmusic.R.drawable.default_cover)
+            .error(com.chao.peakmusic.R.drawable.default_cover)
             .dontAnimate()
             .priority(Priority.HIGH)
             .diskCacheStrategy(DiskCacheStrategy.ALL);

@@ -1,0 +1,32 @@
+// Local/CI release inputs. With no inputs ordinary builds stay version 1 / 1.0 and unsigned.
+// Do not put passwords in Gradle properties, command arguments, BuildConfig or the repository.
+def input = { String name -> providers.environmentVariable(name).orNull }
+def code = input('RELEASE_VERSION_CODE')
+def name = input('RELEASE_VERSION_NAME')
+def versionsProvided = code != null || name != null
+if (versionsProvided && (code == null || !(code ==~ /[0-9]+/) || code.length() > 10
+        || code.toLong() < 1 || code.toLong() > 2100000000L
+        || name == null || !(name ==~ /[A-Za-z0-9][A-Za-z0-9._+\-]{0,63}/))) {
+    throw new GradleException('Set RELEASE_VERSION_CODE (1..2100000000) and RELEASE_VERSION_NAME (1..64 ASCII label characters) together.')
+}
+android.defaultConfig.versionCode = versionsProvided ? code.toInteger() : 1
+android.defaultConfig.versionName = versionsProvided ? name : '1.0'
+
+def signingNames = ['ANDROID_RELEASE_KEYSTORE', 'ANDROID_RELEASE_STORE_PASSWORD',
+                    'ANDROID_RELEASE_KEY_ALIAS', 'ANDROID_RELEASE_KEY_PASSWORD']
+def signingValues = signingNames.collect { input(it) }
+if (signingValues.any { it != null }) {
+    if (signingValues.any { it == null || it.isEmpty() } || !versionsProvided) {
+        throw new GradleException('Release signing requires all four ANDROID_RELEASE_* signing inputs and both RELEASE_VERSION_* inputs. No unsigned fallback for partial signing inputs.')
+    }
+    def keystore = new File(signingValues[0])
+    if (!keystore.isAbsolute() || !keystore.isFile() || !keystore.canRead()) {
+        throw new GradleException('ANDROID_RELEASE_KEYSTORE must be an absolute path to a readable keystore file.')
+    }
+    def signing = android.signingConfigs.create('environmentRelease')
+    signing.storeFile = keystore
+    signing.storePassword = signingValues[1]
+    signing.keyAlias = signingValues[2]
+    signing.keyPassword = signingValues[3]
+    android.buildTypes.getByName('release').signingConfig = signing
+}

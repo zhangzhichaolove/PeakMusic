@@ -1,6 +1,7 @@
 package com.chao.peakmusic.activity;
 
 import android.animation.ObjectAnimator;
+import android.support.v4.media.session.PlaybackStateCompat;
 import android.animation.ValueAnimator;
 import android.content.ComponentName;
 import android.content.Context;
@@ -30,28 +31,22 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.chao.peakmusic.MusicAidlInterface;
 import com.chao.peakmusic.ActivityCall;
 import com.chao.peakmusic.R;
+import com.chao.peakmusic.lyrics.LyricsLoader;
+import com.chao.peakmusic.lyrics.LyricOffsetStore;
+import androidx.appcompat.app.AlertDialog;
 import com.chao.peakmusic.base.BaseActivity;
 import com.chao.peakmusic.model.MusicModel;
-import com.chao.peakmusic.model.SongModel;
 import com.chao.peakmusic.data.MusicLibraryRepository;
 import com.chao.peakmusic.data.MusicTrackEntity;
 import com.chao.peakmusic.service.MusicService;
 import com.chao.peakmusic.utils.ImageLoaderV4;
 import com.chao.peakmusic.utils.LyricsParser;
 import com.chao.peakmusic.utils.LyricsParser.LyricLine;
-import com.chao.peakmusic.utils.MusicDataUtils;
-import com.chao.peakmusic.utils.ScanningUtils;
 import com.chao.peakmusic.widget.MusicAlbumView;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import okhttp3.Call;
-import okhttp3.Callback;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
 
 /**
  * Created by Chao on 2017-12-19.
@@ -73,15 +68,23 @@ public class MusicPlayActivity extends BaseActivity {
     private TextView currentTime;
     private TextView totalTime;
     private Button followLyrics;
+    private Button playbackToggle;
+    private TextView playbackStatus;
     private ObjectAnimator albumAnimator;
-    private Call lyricsCall;
+    private final LyricsLoader lyricsLoader = new LyricsLoader();
+    private LyricOffsetStore offsetStore;
+    private String currentLyricsUrl;
+    private Button lyricsRetry;
+    private Button favoriteButton;
+    private MusicTrackEntity currentTrack;
+    private int favoriteGeneration;
+    private AlertDialog calibrationDialog;
     private MusicAidlInterface musicService;
     private boolean serviceBound;
     private String trackTitle;
-    private String currentSource;
+    private String currentTrackKey;
     private long lyricOffsetMs;
     private TextView lyricOffsetLabel;
-    private final OkHttpClient lyricsClient = new OkHttpClient();
     private boolean hasTimedLyrics;
     private boolean userSeeking;
     private boolean followCurrentLyric = true;
@@ -102,7 +105,21 @@ public class MusicPlayActivity extends BaseActivity {
 
     @Override
     public void initView() {
+        com.chao.peakmusic.utils.BarUtils.applyBottomInsets(findViewById(android.R.id.content));
+        offsetStore = new LyricOffsetStore(this);
         albumMusic = findViewById(R.id.album_music);
+        lyricsRetry = findViewById(R.id.lyrics_retry);
+        lyricsRetry.setOnClickListener(view -> loadLyrics(currentLyricsUrl));
+        favoriteButton = findViewById(R.id.playback_favorite);
+        favoriteButton.setEnabled(false);
+        favoriteButton.setOnClickListener(view -> toggleFavorite());
+        findViewById(R.id.playback_mode).setOnClickListener(view -> showPlaybackMode());
+        findViewById(R.id.lyrics_calibrate).setOnClickListener(view -> showCalibration());
+        playbackToggle = findViewById(R.id.playback_toggle);
+        playbackStatus = findViewById(R.id.playback_status);
+        playbackToggle.setOnClickListener(view -> controlPlayback(0));
+        findViewById(R.id.playback_previous).setOnClickListener(view -> controlPlayback(-1));
+        findViewById(R.id.playback_next).setOnClickListener(view -> controlPlayback(1));
         musicName = findViewById(R.id.tv_music_name);
         musicSinger = findViewById(R.id.tv_music_singer);
         lyricsList = findViewById(R.id.lyrics_list);
@@ -111,16 +128,14 @@ public class MusicPlayActivity extends BaseActivity {
         totalTime = findViewById(R.id.playback_total_time);
         followLyrics = findViewById(R.id.lyrics_follow);
         lyricOffsetLabel = findViewById(R.id.lyric_offset_value);
-        lyricOffsetMs = getSharedPreferences("lyrics", MODE_PRIVATE)
-                .getLong("manual_offset", 0);
+        lyricOffsetMs = 0;
         updateLyricOffsetLabel();
-        findViewById(R.id.lyric_offset_minus).setOnClickListener(view -> adjustLyricOffset(-500));
-        findViewById(R.id.lyric_offset_reset).setOnClickListener(view -> setLyricOffset(0));
-        findViewById(R.id.lyric_offset_plus).setOnClickListener(view -> adjustLyricOffset(500));
         lyricsLayoutManager = new LinearLayoutManager(this);
         lyricsAdapter = new LyricsAdapter();
         lyricsList.setLayoutManager(lyricsLayoutManager);
         lyricsList.setAdapter(lyricsAdapter);
+        // Highlight/line replacements should not fade lyrics out during calibration or track changes.
+        lyricsList.setItemAnimator(null);
         playbackProgress.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
@@ -159,9 +174,9 @@ public class MusicPlayActivity extends BaseActivity {
             followLyrics.setVisibility(View.GONE);
             scrollToCurrentLyric();
         });
-        lyricsList.post(() -> {
-            int verticalPadding = lyricsList.getHeight() / 2;
-            lyricsList.setPadding(0, verticalPadding, 0, verticalPadding);
+        lyricsList.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
+            int padding = (bottom - top) / 2;
+            if (lyricsList.getPaddingTop() != padding) lyricsList.setPadding(0, padding, 0, padding);
         });
 
         MusicModel music = IntentCompat.getParcelableExtra(
@@ -169,7 +184,11 @@ public class MusicPlayActivity extends BaseActivity {
         String name = music == null ? getIntent().getStringExtra(EXTRA_NAME) : music.getName();
         String singer = music == null ? getIntent().getStringExtra(EXTRA_SINGER) : music.getSinger();
         String image = music == null ? getIntent().getStringExtra(EXTRA_IMAGE) : music.getImg();
-        currentSource = music == null ? null : music.getMp3();
+        currentTrack = music == null ? null : MusicTrackEntity.from(music);
+        currentTrackKey = currentTrack == null ? null : currentTrack.source;
+        lyricOffsetMs = offsetStore.get(currentTrackKey);
+        updateLyricOffsetLabel();
+        updateFavorite();
 
         displayTrack(name, singer, image, music == null ? null : music.getLrc());
 
@@ -186,18 +205,12 @@ public class MusicPlayActivity extends BaseActivity {
         musicSinger.setText(singer);
         ImageLoaderV4.getInstance().load(this, albumMusic,
                 TextUtils.isEmpty(image) ? R.drawable.default_cover : image);
-        if (lyricsCall != null) {
-            lyricsCall.cancel();
-            lyricsCall = null;
-        }
+        lyricsLoader.cancel();
+        currentLyricsUrl = lyrics;
         currentLyricLine = -1;
         followCurrentLyric = true;
         followLyrics.setVisibility(View.GONE);
-        if (TextUtils.isEmpty(lyrics)) {
-            showLyricsMessage(getString(R.string.lyrics_empty));
-        } else {
-            loadLyrics(lyrics);
-        }
+        loadLyrics(lyrics);
     }
 
     private void adjustLyricOffset(long deltaMs) {
@@ -205,9 +218,7 @@ public class MusicPlayActivity extends BaseActivity {
     }
 
     private void setLyricOffset(long offsetMs) {
-        lyricOffsetMs = offsetMs;
-        getSharedPreferences("lyrics", MODE_PRIVATE).edit()
-                .putLong("manual_offset", lyricOffsetMs).apply();
+        lyricOffsetMs = offsetStore.set(currentTrackKey, offsetMs);
         updateLyricOffsetLabel();
         currentLyricLine = -1;
         updateCurrentLyric();
@@ -216,6 +227,8 @@ public class MusicPlayActivity extends BaseActivity {
     private void updateLyricOffsetLabel() {
         lyricOffsetLabel.setText(getString(R.string.lyric_offset_value,
                 lyricOffsetMs / 1000f));
+        if (calibrationDialog != null && calibrationDialog.isShowing())
+            calibrationDialog.setMessage(getString(R.string.lyric_calibration_message, lyricOffsetMs / 1000f));
     }
 
     private void startAlbumAnimation() {
@@ -227,43 +240,68 @@ public class MusicPlayActivity extends BaseActivity {
     }
 
     private void loadLyrics(String url) {
-        showLyricsMessage(getString(R.string.lyrics_loading));
-        Request request = new Request.Builder().url(url).build();
-        lyricsCall = lyricsClient.newCall(request);
-        lyricsCall.enqueue(new Callback() {
-            @Override
-            public void onFailure(Call call, IOException error) {
-                if (!call.isCanceled()) {
-                    runOnUiThread(() -> {
-                        if (call == lyricsCall) {
-                            showLyricsMessage(getString(R.string.lyrics_empty));
-                        }
-                    });
-                }
-            }
-
-            @Override
-            public void onResponse(Call call, Response response) throws IOException {
-                String text;
-                try (Response closeableResponse = response) {
-                    text = closeableResponse.isSuccessful() && closeableResponse.body() != null
-                            ? LyricsParser.decode(closeableResponse.body().bytes()) : "";
-                }
-                List<LyricLine> parsedLyrics = LyricsParser.parse(text);
-                runOnUiThread(() -> {
-                    if (call != lyricsCall || call.isCanceled()) {
-                        return;
-                    }
-                    if (parsedLyrics.isEmpty()) {
-                        showLyricsMessage(getString(R.string.lyrics_empty));
-                    } else {
-                        hasTimedLyrics = parsedLyrics.get(0).timeMs >= 0;
-                        lyricsAdapter.setLines(parsedLyrics);
-                        updateCurrentLyric();
-                    }
-                });
+        lyricsLoader.load(url, (state, lines) -> {
+            if (isDestroyed() || isFinishing()) return;
+            lyricsRetry.setVisibility(state == LyricsLoader.State.ERROR ? View.VISIBLE : View.GONE);
+            if (state == LyricsLoader.State.CONTENT) {
+                hasTimedLyrics = lines.get(0).timeMs >= 0;
+                lyricsAdapter.setLines(lines);
+                updateCurrentLyric();
+            } else {
+                showLyricsMessage(getString(state == LyricsLoader.State.LOADING ? R.string.lyrics_loading
+                        : state == LyricsLoader.State.ERROR ? R.string.lyrics_failed : R.string.lyrics_empty));
             }
         });
+    }
+
+    private void showCalibration() {
+        if (TextUtils.isEmpty(currentTrackKey)) return;
+        calibrationDialog = new AlertDialog.Builder(this).setTitle(R.string.lyrics_calibrate)
+                .setMessage(getString(R.string.lyric_calibration_message, lyricOffsetMs / 1000f))
+                .setNegativeButton(R.string.lyric_offset_minus, null)
+                .setNeutralButton(R.string.lyric_offset_reset, null)
+                .setPositiveButton(R.string.lyric_offset_plus, null).create();
+        calibrationDialog.setOnShowListener(dialog -> {
+            calibrationDialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener(view -> adjustLyricOffset(-500));
+            calibrationDialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(view -> setLyricOffset(0));
+            calibrationDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> adjustLyricOffset(500));
+        });
+        calibrationDialog.show();
+    }
+
+    private void updateFavorite() {
+        int generation = ++favoriteGeneration;
+        favoriteButton.setEnabled(false);
+        if (currentTrack == null || TextUtils.isEmpty(currentTrack.source)) return;
+        MusicLibraryRepository.get(this).isFavorite(currentTrack, favorite -> {
+            if (generation != favoriteGeneration || isDestroyed()) return;
+            favoriteButton.setText(favorite ? R.string.remove_favorite : R.string.add_favorite);
+            favoriteButton.setEnabled(true);
+        });
+    }
+
+    private void toggleFavorite() {
+        if (currentTrack == null) return;
+        int generation = ++favoriteGeneration;
+        favoriteButton.setEnabled(false);
+        MusicLibraryRepository.get(this).toggleFavorite(currentTrack, favorite -> {
+            if (generation != favoriteGeneration || isDestroyed()) return;
+            favoriteButton.setText(favorite ? R.string.remove_favorite : R.string.add_favorite);
+            favoriteButton.setEnabled(true);
+        });
+    }
+
+    private void showPlaybackMode() {
+        if (musicService == null) return;
+        try {
+            String[] modes = getResources().getStringArray(R.array.play_modes);
+            new AlertDialog.Builder(this).setTitle(R.string.play_mode)
+                    .setSingleChoiceItems(modes, musicService.getPlayMode(), (dialog, which) -> {
+                        try { if (musicService != null) musicService.seekPlayMode(which); }
+                        catch (RemoteException error) { playbackStatus.setText(R.string.playback_service_unavailable); }
+                        dialog.dismiss();
+                    }).setNegativeButton(R.string.cancel, null).show();
+        } catch (RemoteException error) { playbackStatus.setText(R.string.playback_service_unavailable); }
     }
 
     private void showLyricsMessage(String message) {
@@ -289,7 +327,47 @@ public class MusicPlayActivity extends BaseActivity {
         }
     }
 
+    private void controlPlayback(int direction) {
+        if (musicService == null) return;
+        try {
+            if (direction < 0) musicService.pre();
+            else if (direction > 0) musicService.next();
+            else if (musicService.isPlay()
+                    || musicService.getPlaybackState() == PlaybackStateCompat.STATE_BUFFERING) {
+                musicService.pause();
+            } else musicService.play();
+            updatePlaybackControls();
+        } catch (RemoteException error) {
+            playbackStatus.setText(R.string.playback_service_unavailable);
+        }
+    }
+
+    private void updatePlaybackControls() {
+        playbackToggle.setEnabled(musicService != null);
+        findViewById(R.id.playback_mode).setEnabled(musicService != null);
+        if (musicService == null) return;
+        try {
+            int state = musicService.getPlaybackState();
+            boolean playing = musicService.isPlay();
+            String error = musicService.getPlaybackError();
+            playbackToggle.setText(playing || state == PlaybackStateCompat.STATE_BUFFERING
+                    ? R.string.player_pause : TextUtils.isEmpty(error)
+                    ? R.string.player_play : R.string.player_retry);
+            playbackStatus.setText(!TextUtils.isEmpty(error) ? error
+                    : state == PlaybackStateCompat.STATE_BUFFERING
+                    ? getString(R.string.player_buffering) : "");
+            playbackStatus.setVisibility(playbackStatus.length() == 0 ? View.GONE : View.VISIBLE);
+            if (albumAnimator != null) {
+                if (playing) albumAnimator.resume();
+                else albumAnimator.pause();
+            }
+        } catch (RemoteException error) {
+            playbackStatus.setText(R.string.playback_service_unavailable);
+        }
+    }
+
     private void updatePlaybackProgress() {
+        updatePlaybackControls();
         if (musicService == null || userSeeking) {
             return;
         }
@@ -324,6 +402,19 @@ public class MusicPlayActivity extends BaseActivity {
                 totalSeconds / 60, totalSeconds % 60);
     }
 
+    @Override public boolean onCreateOptionsMenu(android.view.Menu menu) {
+        getMenuInflater().inflate(R.menu.playback, menu);
+        return true;
+    }
+
+    @Override public boolean onOptionsItemSelected(@NonNull android.view.MenuItem item) {
+        if (item.getItemId() == R.id.action_playback_queue) {
+            startActivity(new Intent(this, MusicQueueActivity.class));
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
     private final ServiceConnection serviceConnection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
@@ -342,61 +433,49 @@ public class MusicPlayActivity extends BaseActivity {
     };
 
     private final ActivityCall.Stub playbackCallback = new ActivityCall.Stub() {
-        @Override public void call(boolean isPlay) { }
+        @Override public void call(boolean isPlay) {
+            runOnUiThread(() -> updatePlaybackControls());
+        }
         @Override public void pre() { }
         @Override public void next() { }
         @Override public void defaultPlay() { }
 
         @Override
-        public void trackChanged(String source, String name, String artist, boolean local) {
-            runOnUiThread(() -> updateTrack(source, name, artist, local));
+        public void trackChanged(MusicTrackEntity track) {
+            runOnUiThread(() -> updateTrack(track));
         }
     };
 
-    private void updateTrack(String source, String name, String artist, boolean local) {
-        if (TextUtils.equals(source, currentSource)) {
+    private void updateTrack(MusicTrackEntity track) {
+        if (track != null && currentTrack != null && TextUtils.equals(track.source, currentTrackKey)
+                && TextUtils.equals(track.getPlaybackUrl(), currentTrack.getPlaybackUrl())
+                && TextUtils.equals(track.name, currentTrack.name) && TextUtils.equals(track.artist, currentTrack.artist)
+                && TextUtils.equals(track.imageUrl, currentTrack.imageUrl) && TextUtils.equals(track.lyricsUrl, currentTrack.lyricsUrl)) {
+            updateFavorite();
             return;
         }
-        currentSource = source;
-        MusicTrackEntity loadedTrack = findLoadedTrack(source, local);
-        if (loadedTrack != null) {
-            displayTrack(name, artist, loadedTrack.imageUrl, loadedTrack.lyricsUrl);
-            return;
+        currentTrackKey = track == null ? null : track.source;
+        currentTrack = track;
+        lyricsLoader.cancel();
+        currentLyricsUrl = null;
+        lyricsRetry.setVisibility(View.GONE);
+        showLyricsMessage(getString(R.string.lyrics_loading));
+        if (calibrationDialog != null) calibrationDialog.dismiss();
+        lyricOffsetMs = offsetStore.get(currentTrackKey);
+        updateLyricOffsetLabel();
+        updateFavorite();
+        displayTrack(track == null ? null : track.name, track == null ? null : track.artist,
+                track == null ? null : track.imageUrl, track == null ? null : track.lyricsUrl);
+        // Old persisted queues may have no metadata. Restore from their established library key;
+        // never look up a newer catalogue by URL, which can belong to a different API source.
+        if (track != null && track.imageUrl == null && track.lyricsUrl == null) {
+            MusicLibraryRepository.get(this).loadTrack(track.source, saved -> {
+                if (isDestroyed() || currentTrack != track || saved == null) return;
+                currentTrack = saved;
+                updateFavorite();
+                displayTrack(track.name, track.artist, saved.imageUrl, saved.lyricsUrl);
+            });
         }
-        MusicLibraryRepository.get(this).loadTrack(source, track -> {
-                if (!TextUtils.equals(source, currentSource)) {
-                    return;
-                }
-                displayTrack(name, artist,
-                        track == null ? null : track.imageUrl,
-                        track == null ? null : track.lyricsUrl);
-        });
-    }
-
-    private MusicTrackEntity findLoadedTrack(String source, boolean local) {
-        if (TextUtils.isEmpty(source)) {
-            return null;
-        }
-        if (local) {
-            List<SongModel> localMusic = ScanningUtils.getInstance(this).getMusic();
-            if (localMusic != null) {
-                for (SongModel song : localMusic) {
-                    if (song != null && TextUtils.equals(source, song.getPath())) {
-                        return MusicTrackEntity.from(song);
-                    }
-                }
-            }
-            return null;
-        }
-        List<MusicModel> onlineMusic = MusicDataUtils.getInstance().getMusicList();
-        if (onlineMusic != null) {
-            for (MusicModel music : onlineMusic) {
-                if (music != null && TextUtils.equals(source, music.getMp3())) {
-                    return MusicTrackEntity.from(music);
-                }
-            }
-        }
-        return null;
     }
 
     @Override
@@ -405,10 +484,12 @@ public class MusicPlayActivity extends BaseActivity {
         serviceBound = bindService(new Intent(this, MusicService.class),
                 serviceConnection, Context.BIND_AUTO_CREATE);
         progressHandler.post(progressUpdater);
+        updateFavorite();
     }
 
     @Override
     protected void onStop() {
+        if (albumAnimator != null) albumAnimator.pause();
         progressHandler.removeCallbacks(progressUpdater);
         if (serviceBound) {
             try {
@@ -426,9 +507,8 @@ public class MusicPlayActivity extends BaseActivity {
 
     @Override
     protected void onDestroy() {
-        if (lyricsCall != null) {
-            lyricsCall.cancel();
-        }
+        lyricsLoader.cancel();
+        if (calibrationDialog != null) calibrationDialog.dismiss();
         if (albumAnimator != null) {
             albumAnimator.cancel();
         }
@@ -479,7 +559,7 @@ public class MusicPlayActivity extends BaseActivity {
             holder.text.setText(lines.get(position).text);
             holder.text.setTextSize(active ? 20 : 16);
             holder.text.setTextColor(ContextCompat.getColor(MusicPlayActivity.this,
-                    active ? R.color.lyric_active : R.color.normalColor));
+                    active ? R.color.lyric_active : R.color.lyric_inactive));
             holder.text.setTypeface(null, active ? Typeface.BOLD : Typeface.NORMAL);
         }
 

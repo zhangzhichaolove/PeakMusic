@@ -13,6 +13,7 @@ public class App extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+        com.chao.peakmusic.base.ApiResponseLogStore.initialize(this);
         GeneralVar.setContext(this);
         registerActivityLifecycleCallbacks(AppStatusListener.getInstance().getAppLifecycleListener());
     }

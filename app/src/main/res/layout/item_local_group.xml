@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:minHeight="64dp" android:orientation="vertical" android:padding="16dp"
+    android:background="?android:attr/selectableItemBackground" android:focusable="true">
+    <TextView android:id="@+id/local_group_title" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:maxLines="3" android:ellipsize="end"
+        android:textSize="17sp" android:textColor="?android:attr/textColorPrimary" />
+    <TextView android:id="@+id/local_group_detail" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:layout_marginTop="4dp"
+        android:textSize="13sp" android:textColor="?android:attr/textColorSecondary" />
+</LinearLayout>

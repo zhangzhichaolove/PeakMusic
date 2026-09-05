@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent" android:orientation="vertical">
+    <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rl_content"
@@ -28,7 +29,7 @@
             android:layout_marginTop="12dp"
             android:gravity="center"
             android:text="@string/music_loading"
-            android:textColor="@android:color/darker_gray"
+            android:textColor="?android:attr/textColorSecondary"
             android:textSize="16sp" />
 
         <Button
@@ -41,3 +42,5 @@
     </LinearLayout>
 
 </FrameLayout>
+    <include layout="@layout/view_music_pagination" />
+</LinearLayout>

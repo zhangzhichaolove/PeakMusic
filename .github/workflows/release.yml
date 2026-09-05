@@ -1,0 +1,79 @@
+name: Signed release archive
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_code:
+        description: 'New Android versionCode (1..2100000000; greater than the last published code)'
+        required: true
+        type: string
+      version_name:
+        description: 'Release label, e.g. 1.1.0'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: signed-release
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    uses: ./.github/workflows/android.yml
+    # Deliberately do not pass release secrets to the verification workflow.
+  archive:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    # Configure this environment with required reviewers and restricted release branches/tags.
+    environment: release
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-disabled: true
+      - name: Install compile SDK and verification tools
+        run: sdkmanager 'platforms;android-37' 'build-tools;37.0.0'
+      - name: Decode private keystore outside the workspace
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          python3 - <<'PY'
+          import base64, os
+          from pathlib import Path
+          os.umask(0o077)
+          path = Path(os.environ['RUNNER_TEMP']) / 'release-signing.p12'
+          path.write_bytes(base64.b64decode(os.environ['RELEASE_KEYSTORE_BASE64'], validate=True))
+          PY
+      - name: Test, sign, verify certificate/version/mapping, and archive
+        env:
+          RELEASE_VERSION_CODE: ${{ inputs.version_code }}
+          RELEASE_VERSION_NAME: ${{ inputs.version_name }}
+          ANDROID_RELEASE_KEYSTORE: ${{ runner.temp }}/release-signing.p12
+          ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          ANDROID_RELEASE_CERT_SHA256: ${{ secrets.RELEASE_CERT_SHA256 }}
+        run: |
+          python3 -m unittest discover -s scripts/tests -v
+          python3 scripts/package-release.py
+      - name: Retain verified APK and its exact mapping together (not a store upload)
+        uses: actions/upload-artifact@v4
+        with:
+          name: verified-release-${{ inputs.version_code }}-${{ github.sha }}
+          path: app/build/release-archives/*.zip
+          if-no-files-found: error
+          retention-days: 90
+      - name: Delete temporary signing material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release-signing.p12"

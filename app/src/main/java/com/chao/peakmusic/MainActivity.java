@@ -18,7 +18,6 @@ import android.net.Uri;
 import android.provider.Settings;
 import android.text.InputType;
 import android.util.Log;
-import android.view.KeyEvent;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.FrameLayout;
@@ -55,12 +54,10 @@ import com.chao.peakmusic.fragment.OnLineMusicFragment;
 import com.chao.peakmusic.listener.PlayMusicListener;
 import com.chao.peakmusic.model.MusicModel;
 import com.chao.peakmusic.model.SongModel;
-import com.chao.peakmusic.data.MusicLibraryRepository;
 import com.chao.peakmusic.data.MusicTrackEntity;
 import com.chao.peakmusic.service.MusicService;
 import com.chao.peakmusic.service.PlaybackModeNavigator;
 import com.chao.peakmusic.utils.ImageLoaderV4;
-import com.chao.peakmusic.utils.KeyDownUtils;
 import com.chao.peakmusic.utils.MusicDataUtils;
 import com.chao.peakmusic.utils.ScanningUtils;
 import com.chao.peakmusic.utils.ToastUtils;
@@ -89,31 +86,51 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
     private Handler handler;
     private Fragment[] fragments;
     private HomePageAdapter pageAdapter;
-    private ArrayList<SongModel> music;
     private MusicModel currentOnlineMusic;
     private String currentTrackName;
     private String currentTrackArtist;
     private String currentTrackImage;
     private boolean serviceBound;
+    private boolean started;
+    private boolean observingMedia;
+    private final Handler mediaHandler = new Handler(Looper.getMainLooper());
+    private final Runnable refreshChangedMedia = () -> {
+        if (!started) return;
+        ScanningUtils.getInstance(this).invalidate();
+        if (vp_content.getCurrentItem() == 1) loadMusic();
+    };
+    private final android.database.ContentObserver mediaObserver = new android.database.ContentObserver(mediaHandler) {
+        @Override public void onChange(boolean selfChange) {
+            mediaHandler.removeCallbacks(refreshChangedMedia);
+            mediaHandler.postDelayed(refreshChangedMedia, 400);
+        }
+    };
+    private final ViewPager2.OnPageChangeCallback localPageCallback = new ViewPager2.OnPageChangeCallback() {
+        @Override public void onPageSelected(int position) {
+            if (position == 1) loadMusic();
+        }
+    };
     private final ActivityResultLauncher<String> audioPermissionLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
+                ScanningUtils.getInstance(this).invalidate();
                 if (granted) {
+                    observeMedia();
                     loadMusic();
-                } else {
-                    onScanningMusicComplete(new ArrayList<>());
                 }
-                requestNotificationPermission();
             });
     private final ActivityResultLauncher<String> notificationPermissionLauncher =
-            registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
-                // Playback remains available when notifications are declined.
-                requestFloatingControlPermission();
+            registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted ->
+                    ToastUtils.showToast(getString(granted ? R.string.notification_enabled : R.string.notification_declined)));
+    private final ActivityResultLauncher<Intent> localSettingsLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+                ScanningUtils.getInstance(this).invalidate();
+                observeMedia();
+                loadMusic();
             });
     private final ActivityResultLauncher<Intent> overlayPermissionLauncher =
             registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
-                if (canDrawOverlays()) {
-                    showFloatingControl();
-                }
+                if (canDrawOverlays()) setFloatingControl(true);
+                else ToastUtils.showToast(getString(R.string.floating_permission_declined));
             });
     private final Runnable positionUpdater = new Runnable() {
         @Override
@@ -130,6 +147,7 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
 
     @Override
     public void initView() {
+        com.chao.peakmusic.utils.BarUtils.applyBottomInsets(findViewById(android.R.id.content));
         mToolbar = findViewById(R.id.mToolbar);
         tabs = findViewById(R.id.tabs);
         mDrawerLayout = findViewById(R.id.dl_left);
@@ -150,70 +168,120 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         fragments = new Fragment[]{OnLineMusicFragment.newInstance(), LocalMusicFragment.newInstance()};
         pageAdapter = new HomePageAdapter(this, fragments);
         vp_content.setAdapter(pageAdapter);
+        vp_content.registerOnPageChangeCallback(localPageCallback);
         new TabLayoutMediator(tabs, vp_content,
                 (tab, position) -> tab.setText(position == 0
                         ? R.string.online_music : R.string.local_music)).attach();
+        getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
+            @Override public void handleOnBackPressed() {
+                if (mDrawerLayout.isDrawerOpen(GravityCompat.START)) mDrawerLayout.closeDrawer(GravityCompat.START);
+                else if (vp_content.getCurrentItem() != 1 || !((LocalMusicFragment) homeFragment(1)).navigateUp()) moveTaskToBack(true);
+            }
+        });
         handler = new Handler(Looper.getMainLooper());
         ImageLoaderV4.getInstance().loadCircle(mContext, iv_album_cover, R.drawable.default_cover);
     }
 
     @Override
     public void initData() {
-        if (hasMusicPermission()) {
-            loadMusic();
-            requestNotificationPermission();
-        } else {
-            audioPermissionLauncher.launch(Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-                    ? Manifest.permission.READ_MEDIA_AUDIO
-                    : Manifest.permission.READ_EXTERNAL_STORAGE);
-        }
+        ScanningUtils.getInstance(this).setListener(this);
+        startPlaybackService(); // Online playback never depends on granting local media access.
         startTrackingPosition();
     }
 
     private void loadMusic() {
-        if (ScanningUtils.getInstance(mContext).getMusic() == null) {
-            ScanningUtils.getInstance(mContext).setListener(this).scanMusic();
-        } else {
-            onScanningMusicComplete(ScanningUtils.getInstance(mContext).getMusic());
-        }
+        ScanningUtils scanner = ScanningUtils.getInstance(this).setListener(this);
+        onScanStateChanged(scanner.getState());
+        if (!scanner.hasPermission()) return;
+        if (scanner.getMusic() != null && scanner.getState() == ScanningUtils.State.READY) {
+            onScanningMusicComplete(scanner.getMusic());
+        } else scanner.scanMusic();
     }
 
-    private boolean hasMusicPermission() {
-        String permission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-                ? Manifest.permission.READ_MEDIA_AUDIO
-                : Manifest.permission.READ_EXTERNAL_STORAGE;
-        return Build.VERSION.SDK_INT < Build.VERSION_CODES.M
-                || ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED;
+    public void requestLocalMusic() {
+        ScanningUtils scanner = ScanningUtils.getInstance(this);
+        if (scanner.hasPermission()) {
+            scanner.invalidate();
+            loadMusic();
+            return;
+        }
+        String permission = ScanningUtils.musicPermission();
+        boolean asked = getPreferences(MODE_PRIVATE).getBoolean("audio_permission_asked", false);
+        if (asked && !shouldShowRequestPermissionRationale(permission)) {
+            new AlertDialog.Builder(this).setMessage(R.string.local_permission_settings)
+                    .setNegativeButton(R.string.cancel, null)
+                    .setPositiveButton(R.string.open_app_settings, (dialog, which) -> localSettingsLauncher.launch(
+                            new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName())))).show();
+        } else {
+            getPreferences(MODE_PRIVATE).edit().putBoolean("audio_permission_asked", true).apply();
+            audioPermissionLauncher.launch(permission);
+        }
     }
 
     private void requestNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-                && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED) {
+                && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                && (!getPreferences(MODE_PRIVATE).getBoolean("notification_permission_asked", false)
+                    || shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS))) {
+            getPreferences(MODE_PRIVATE).edit().putBoolean("notification_permission_asked", true).apply();
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
         } else {
-            requestFloatingControlPermission();
+            Intent settings = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                    ? new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName())
+                    : new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName()));
+            startActivity(settings);
         }
     }
 
     private void requestFloatingControlPermission() {
-        if (canDrawOverlays()) {
-            showFloatingControl();
-            return;
+        boolean enabled = getSharedPreferences(MusicService.FLOATING_PREFERENCES, MODE_PRIVATE)
+                .getBoolean(MusicService.KEY_FLOATING_ENABLED, false);
+        if (enabled && canDrawOverlays()) { setFloatingControl(false); return; }
+        if (canDrawOverlays()) { setFloatingControl(true); return; }
+        new AlertDialog.Builder(this).setMessage(R.string.floating_permission_explanation)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.open_app_settings, (dialog, which) -> overlayPermissionLauncher.launch(
+                        new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())))).show();
+    }
+
+    private void setFloatingControl(boolean enabled) {
+        getSharedPreferences(MusicService.FLOATING_PREFERENCES, MODE_PRIVATE).edit()
+                .putBoolean(MusicService.KEY_FLOATING_ENABLED, enabled).apply();
+        nv_menu.getMenu().findItem(R.id.action_floating_control).setChecked(enabled);
+        ContextCompat.startForegroundService(this, new Intent(this, MusicService.class).setAction(enabled
+                ? MusicService.ACTION_SHOW_FLOATING_CONTROL : MusicService.ACTION_HIDE_FLOATING_CONTROL));
+    }
+
+    private void observeMedia() {
+        if (!started || observingMedia || !ScanningUtils.getInstance(this).hasPermission()) return;
+        getContentResolver().registerContentObserver(android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                true, mediaObserver);
+        observingMedia = true;
+    }
+
+    @Override protected void onStart() {
+        super.onStart();
+        started = true;
+        ScanningUtils.getInstance(this).invalidate();
+        observeMedia();
+        if (vp_content.getCurrentItem() == 1) loadMusic();
+        nv_menu.getMenu().findItem(R.id.action_floating_control).setChecked(
+                getSharedPreferences(MusicService.FLOATING_PREFERENCES, MODE_PRIVATE)
+                        .getBoolean(MusicService.KEY_FLOATING_ENABLED, false) && canDrawOverlays());
+    }
+
+    @Override protected void onStop() {
+        started = false;
+        mediaHandler.removeCallbacks(refreshChangedMedia);
+        if (observingMedia) {
+            getContentResolver().unregisterContentObserver(mediaObserver);
+            observingMedia = false;
         }
-        Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                Uri.parse("package:" + getPackageName()));
-        overlayPermissionLauncher.launch(intent);
+        super.onStop();
     }
 
     private boolean canDrawOverlays() {
         return Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(this);
-    }
-
-    private void showFloatingControl() {
-        Intent intent = new Intent(this, MusicService.class)
-                .setAction(MusicService.ACTION_SHOW_FLOATING_CONTROL);
-        ContextCompat.startForegroundService(this, intent);
     }
 
     @Override
@@ -249,6 +317,14 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
     public boolean onNavigationItemSelected(@NonNull MenuItem item) {
         if (mDrawerLayout.isDrawerOpen(GravityCompat.START)) {
             mDrawerLayout.closeDrawer(GravityCompat.START);
+        }
+        if (item.getItemId() == R.id.action_floating_control) {
+            requestFloatingControlPermission();
+            return true;
+        }
+        if (item.getItemId() == R.id.action_notification_permission) {
+            requestNotificationPermission();
+            return true;
         }
         if (item.getItemId() == R.id.action_api_address) {
             showApiAddressDialog();
@@ -376,6 +452,8 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
                 .show();
     }
 
+    private okhttp3.Call connectionTest;
+
     private void showApiAddressDialog() {
         EditText input = new EditText(this);
         input.setSingleLine(true);
@@ -390,9 +468,9 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         content.addView(input, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         LinearLayout actions = new LinearLayout(this);
-        Button restore = new Button(this);
+        Button restore = new androidx.appcompat.widget.AppCompatButton(this);
         restore.setText(R.string.restore_default);
-        Button test = new Button(this);
+        Button test = new androidx.appcompat.widget.AppCompatButton(this);
         test.setText(R.string.test_connection);
         actions.addView(restore, new LinearLayout.LayoutParams(0,
                 LinearLayout.LayoutParams.WRAP_CONTENT, 1));
@@ -406,6 +484,10 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
                 .setNegativeButton(R.string.cancel, null)
                 .setPositiveButton(R.string.save, null)
                 .create();
+        dialog.setOnDismissListener(ignored -> {
+            if (connectionTest != null) connectionTest.cancel();
+            connectionTest = null;
+        });
         dialog.setOnShowListener(ignored -> {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
                     if (!ApiAddressManager.saveBaseUrl(input.getText().toString())) {
@@ -417,7 +499,7 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
                     if (ApiAddressManager.getBaseUrl().startsWith("http://")) {
                         ToastUtils.showToast(getString(R.string.cleartext_api_warning));
                     }
-                    ((OnLineMusicFragment) fragments[0]).reloadMusic();
+                    ((OnLineMusicFragment) homeFragment(0)).reloadMusic();
                 });
             restore.setOnClickListener(view -> {
                 input.setText(ApiUrl.BASE_URL);
@@ -426,9 +508,12 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
             test.setOnClickListener(view -> {
                 test.setEnabled(false);
                 test.setText(R.string.testing_connection);
-                ApiAddressManager.testConnection(input.getText().toString(), (reachable, detail) -> {
+                String testedAddress = input.getText().toString();
+                connectionTest = ApiAddressManager.testConnection(testedAddress, (reachable, detail) -> {
+                    if (isDestroyed() || !dialog.isShowing()) return;
                     test.setEnabled(true);
                     test.setText(R.string.test_connection);
+                    if (!testedAddress.equals(input.getText().toString())) return;
                     ToastUtils.showToast(getString(reachable
                                     ? R.string.connection_success : R.string.connection_failed,
                             detail == null ? getString(R.string.unknown_error) : detail));
@@ -536,9 +621,7 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
                     currentPosition -= 1;
                     MusicDataUtils.getInstance().setCurrentPosition(currentPosition);
                     MusicModel musicModel = musicList.get(currentPosition);
-                    playMusic(musicModel.getMp3(),
-                            musicModel.getName(), musicModel.getSinger(),
-                            musicModel.getImg());
+                    playMusic(musicModel);
                 }
             });
         }
@@ -558,9 +641,7 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
                     currentPosition += 1;
                     MusicDataUtils.getInstance().setCurrentPosition(currentPosition);
                     MusicModel musicModel = musicList.get(currentPosition);
-                    playMusic(musicModel.getMp3(),
-                            musicModel.getName(), musicModel.getSinger(),
-                            musicModel.getImg());
+                    playMusic(musicModel);
                 }
             });
         }
@@ -572,9 +653,7 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
                 if (musicList != null && musicList.size() > 0) {
                     MusicDataUtils.getInstance().setCurrentPosition(0);
                     MusicModel musicModel = musicList.get(0);
-                    playMusic(musicModel.getMp3(),
-                            musicModel.getName(), musicModel.getSinger(),
-                            musicModel.getImg());
+                    playMusic(musicModel);
                 } else {
                     ToastUtils.showToast("你的曲库没有歌曲呢~");
                 }
@@ -582,32 +661,26 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         }
 
         @Override
-        public void trackChanged(String source, String name, String artist, boolean local) {
+        public void trackChanged(MusicTrackEntity track) {
             runOnUiThread(() -> {
-                if (local) {
-                    currentOnlineMusic = null;
-                    currentTrackImage = findLocalCover(source);
-                    ImageLoaderV4.getInstance().loadCircle(mContext, iv_album_cover,
-                            currentTrackImage == null ? R.drawable.default_cover : currentTrackImage);
-                } else {
-                    currentOnlineMusic = findOnlineMusic(source);
-                    currentTrackImage = currentOnlineMusic == null ? null
-                            : currentOnlineMusic.getImg();
-                    ImageLoaderV4.getInstance().loadCircle(mContext, iv_album_cover,
-                            currentTrackImage == null ? R.drawable.default_cover : currentTrackImage);
-                }
-                currentTrackName = name;
-                currentTrackArtist = artist;
-                tv_title.setText(name);
-                tv_artist.setText(artist);
+                currentOnlineMusic = track == null || track.local ? null : track.toOnlineMusic();
+                currentTrackImage = track == null ? null : track.imageUrl;
+                ImageLoaderV4.getInstance().loadCircle(mContext, iv_album_cover,
+                        currentTrackImage == null ? R.drawable.default_cover : currentTrackImage);
+                currentTrackName = track == null ? "" : track.name;
+                currentTrackArtist = track == null ? "" : track.artist;
+                tv_title.setText(currentTrackName);
+                tv_artist.setText(currentTrackArtist);
             });
         }
     };
 
     @Override
     protected void onDestroy() {
+        if (connectionTest != null) connectionTest.cancel();
         handler.removeCallbacks(positionUpdater);
         ScanningUtils.getInstance(this).clearListener(this);
+        vp_content.unregisterOnPageChangeCallback(localPageCallback);
         if (serviceBound) {
             try {
                 if (mService != null) {
@@ -622,27 +695,23 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
         super.onDestroy();
     }
 
-    @Override
-    public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (mDrawerLayout.isDrawerOpen(GravityCompat.START)) {
-            mDrawerLayout.closeDrawer(GravityCompat.START);
-            return true;
-        }
-        return KeyDownUtils.BlackBackstage(this, keyCode);
+    private Fragment homeFragment(int position) {
+        // FragmentStateAdapter restores its own instances; the constructor array may be detached.
+        Fragment restored = getSupportFragmentManager().findFragmentByTag("f" + pageAdapter.getItemId(position));
+        return restored == null ? fragments[position] : restored;
     }
 
     @Override
     public void onScanningMusicComplete(ArrayList<SongModel> music) {
-        ((LocalMusicFragment) fragments[1]).setMusic(music);
-        startPlaybackService(music);
-        this.music = music;
+        ((LocalMusicFragment) homeFragment(1)).setMusic(music);
     }
 
-    private void startPlaybackService(ArrayList<SongModel> songs) {
+    @Override public void onScanStateChanged(ScanningUtils.State state) {
+        ((LocalMusicFragment) homeFragment(1)).setScanState(state);
+    }
+
+    private void startPlaybackService() {
         Intent intent = new Intent(mContext, MusicService.class);
-        if (songs != null) {
-            intent.putParcelableArrayListExtra(MusicService.EXTRAS_MUSIC, songs);
-        }
         ContextCompat.startForegroundService(mContext, intent);
         if (!serviceBound) {
             serviceBound = mContext.bindService(intent, conn, Context.BIND_AUTO_CREATE);
@@ -650,89 +719,22 @@ public class MainActivity extends BaseActivity implements NavigationView.OnNavig
     }
 
     @Override
-    public void playMusic(int position, String name, String artist) {
-        currentOnlineMusic = null;
-        currentTrackName = name;
-        currentTrackArtist = artist;
-        currentTrackImage = music != null && position >= 0 && position < music.size()
-                ? findLocalCover(music.get(position).getPath()) : null;
+    public void playMusic(MusicModel music) {
+        currentOnlineMusic = music;
+        currentTrackName = music.getName(); currentTrackArtist = music.getSinger(); currentTrackImage = music.getImg();
         iv_play.setSelected(true);
-        tv_title.setText(name);
-        tv_artist.setText(artist);
-        ImageLoaderV4.getInstance().loadCircle(mContext, iv_album_cover,
-                currentTrackImage == null ? R.drawable.default_cover : currentTrackImage);
-        if (music != null && position >= 0 && position < music.size()) {
-            MusicLibraryRepository.get(this).saveMetadata(
-                    MusicTrackEntity.from(music.get(position)));
+        tv_title.setText(currentTrackName); tv_artist.setText(currentTrackArtist);
+        ImageLoaderV4.getInstance().loadCircle(mContext, iv_album_cover, currentTrackImage);
+        List<MusicModel> catalogue = MusicDataUtils.getInstance().getMusicList();
+        ArrayList<MusicTrackEntity> queue = new ArrayList<>();
+        String key = MusicTrackEntity.keyOf(music);
+        int selected = -1;
+        if (catalogue != null) for (MusicModel item : catalogue) {
+            if (key.equals(MusicTrackEntity.keyOf(item))) selected = queue.size();
+            queue.add(MusicTrackEntity.from(item));
         }
-        try {
-            if (mService != null) {
-                mService.openAudio(position);
-            }
-        } catch (RemoteException e) {
-            Log.e(TAG, "Unable to play local track", e);
-        }
+        if (selected < 0) { queue.clear(); queue.add(MusicTrackEntity.from(music)); selected = 0; }
+        com.chao.peakmusic.service.PlaybackStorage.get(this).play(queue, selected);
     }
 
-    @Override
-    public void playMusic(String url, String name, String artist, String img) {
-        currentOnlineMusic = findOnlineMusic(url);
-        currentTrackName = name;
-        currentTrackArtist = artist;
-        currentTrackImage = img;
-        iv_play.setSelected(true);
-        tv_title.setText(name);
-        tv_artist.setText(artist);
-        ImageLoaderV4.getInstance().loadCircle(mContext, iv_album_cover, img);
-        if (currentOnlineMusic != null) {
-            MusicLibraryRepository.get(this).saveMetadata(
-                    MusicTrackEntity.from(currentOnlineMusic));
-        }
-        try {
-            if (mService != null) {
-                List<MusicModel> queue = MusicDataUtils.getInstance().getMusicList();
-                if (queue != null && !queue.isEmpty()) {
-                    ArrayList<String> urls = new ArrayList<>();
-                    ArrayList<String> names = new ArrayList<>();
-                    ArrayList<String> artists = new ArrayList<>();
-                    for (MusicModel item : queue) {
-                        urls.add(item.getMp3());
-                        names.add(item.getName());
-                        artists.add(item.getSinger());
-                    }
-                    mService.setOnlineQueue(urls, names, artists,
-                            MusicDataUtils.getInstance().getCurrentPosition());
-                }
-                mService.playAudio(url, name, artist);
-            }
-        } catch (RemoteException e) {
-            Log.e(TAG, "Unable to play online track", e);
-        }
-    }
-
-    private MusicModel findOnlineMusic(String url) {
-        List<MusicModel> musicList = MusicDataUtils.getInstance().getMusicList();
-        if (musicList == null) {
-            return null;
-        }
-        for (MusicModel musicModel : musicList) {
-            if (musicModel != null && url != null && url.equals(musicModel.getMp3())) {
-                return musicModel;
-            }
-        }
-        return null;
-    }
-
-    private String findLocalCover(String source) {
-        if (music == null || source == null) {
-            return null;
-        }
-        for (SongModel song : music) {
-            if (source.equals(song.getPath()) && song.getAlbumId() > 0) {
-                return ScanningUtils.getInstance(this)
-                        .getMediaStoreAlbumCoverUri(song.getAlbumId()).toString();
-            }
-        }
-        return null;
-    }
 }

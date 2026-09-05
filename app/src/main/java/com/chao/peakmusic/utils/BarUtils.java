@@ -42,6 +42,22 @@ public final class BarUtils {
         ViewCompat.requestApplyInsets(toolbar);
     }
 
+    public static void applyPageInsets(View root, View toolbar) {
+        applyTopInset(toolbar);
+        applyBottomInsets(root);
+    }
+
+    public static void applyBottomInsets(View root) {
+        int left = root.getPaddingLeft(), right = root.getPaddingRight(), bottom = root.getPaddingBottom();
+        ViewCompat.setOnApplyWindowInsetsListener(root, (view, insets) -> {
+            androidx.core.graphics.Insets safe = insets.getInsets(WindowInsetsCompat.Type.systemBars()
+                    | WindowInsetsCompat.Type.displayCutout() | WindowInsetsCompat.Type.ime());
+            view.setPadding(left + safe.left, view.getPaddingTop(), right + safe.right, bottom + safe.bottom);
+            return insets;
+        });
+        ViewCompat.requestApplyInsets(root);
+    }
+
     @SuppressWarnings("deprecation")
     private static void setLegacyTransparentStatusBar(Window window) {
         window.setStatusBarColor(Color.TRANSPARENT);

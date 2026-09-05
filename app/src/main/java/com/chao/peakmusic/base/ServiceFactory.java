@@ -62,7 +62,8 @@ public class ServiceFactory {
             retrofitCache.put(baseUrl, newRetrofit);
             retrofit = newRetrofit;
         }
-        return retrofit.create(serviceClass);
+        S service = retrofit.create(serviceClass);
+        return serviceClass == ApiUrl.class ? serviceClass.cast(new SourcedMusicApi((ApiUrl) service, baseUrl)) : service;
     }
 
     private final static long DEFAULT_TIMEOUT = 30;

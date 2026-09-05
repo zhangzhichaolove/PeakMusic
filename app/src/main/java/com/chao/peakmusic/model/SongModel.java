@@ -34,6 +34,8 @@ public class SongModel implements Parcelable {
      * 音乐在本地存储中的文件路径
      */
     private String filePath;
+    private String volumeName;
+    private String relativePath;
     /**
      * 歌曲长度
      */
@@ -101,6 +103,11 @@ public class SongModel implements Parcelable {
         this.filePath = filePath;
     }
 
+    public String getVolumeName() { return volumeName; }
+    public void setVolumeName(String value) { volumeName = value; }
+    public String getRelativePath() { return relativePath; }
+    public void setRelativePath(String value) { relativePath = value; }
+
     public int getDuration() {
         return duration;
     }
@@ -132,6 +139,8 @@ public class SongModel implements Parcelable {
         dest.writeString(filePath);
         dest.writeInt(duration);
         dest.writeLong(size);
+        dest.writeString(volumeName);
+        dest.writeString(relativePath);
     }
 
     public static final Parcelable.Creator<SongModel> CREATOR = new Creator<SongModel>() {
@@ -155,6 +164,8 @@ public class SongModel implements Parcelable {
         filePath = in.readString();
         duration = in.readInt();
         size = in.readLong();
+        volumeName = in.readString();
+        relativePath = in.readString();
     }
 
 }

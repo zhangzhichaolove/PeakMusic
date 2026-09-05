@@ -1,5 +1,6 @@
 // ActivityCall.aidl
 package com.chao.peakmusic;
+import com.chao.peakmusic.data.MusicTrackEntity;
 
 // Declare any non-default types here with import statements
 
@@ -13,5 +14,6 @@ interface ActivityCall {
 
     void defaultPlay();
 
-    void trackChanged(String source, String name, String artist, boolean local);
+    // One selected track, never the full queue. Carries stable identity plus mutable playback URL.
+    void trackChanged(in MusicTrackEntity track);
 }

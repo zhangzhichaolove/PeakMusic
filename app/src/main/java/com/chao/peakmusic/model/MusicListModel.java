@@ -6,6 +6,7 @@ import java.util.List;
  * Created by Chao on 2018-09-23.
  */
 
+@androidx.annotation.Keep
 public class MusicListModel {
     /**
      * "total": 16,

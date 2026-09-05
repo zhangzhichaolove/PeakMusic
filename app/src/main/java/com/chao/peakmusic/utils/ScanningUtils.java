@@ -1,5 +1,9 @@
 package com.chao.peakmusic.utils;
 
+import android.Manifest;
+import android.os.Build;
+import android.content.pm.PackageManager;
+import androidx.core.content.ContextCompat;
 import android.content.ContentResolver;
 import android.content.ContentUris;
 import android.content.Context;
@@ -25,14 +29,19 @@ import java.util.concurrent.Executors;
 public class ScanningUtils {
 
     private static volatile ScanningUtils instance;
+    public enum State { IDLE, UNAUTHORIZED, SCANNING, READY, ERROR }
+    private final Context context;
     private final ContentResolver contentResolver;
+    private State state = State.IDLE;
+    private long generation;
     private final ExecutorService scanExecutor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private volatile ArrayList<SongModel> musics;
     private WeakReference<ScanningListener> listener = new WeakReference<>(null);
 
     private ScanningUtils(Context context) {
-        contentResolver = context.getApplicationContext().getContentResolver();
+        this.context = context.getApplicationContext();
+        contentResolver = this.context.getContentResolver();
     }
 
     public static ScanningUtils getInstance(Context context) {
@@ -51,17 +60,58 @@ public class ScanningUtils {
      *
      * @return
      */
+    public static String musicPermission() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                ? Manifest.permission.READ_MEDIA_AUDIO : Manifest.permission.READ_EXTERNAL_STORAGE;
+    }
+
+    public boolean hasPermission() {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.M || ContextCompat.checkSelfPermission(context,
+                musicPermission()) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    public State getState() { return hasPermission() ? state : State.UNAUTHORIZED; }
+
+    public void invalidate() {
+        generation++;
+        state = hasPermission() ? State.IDLE : State.UNAUTHORIZED;
+        if (state == State.UNAUTHORIZED) musics = null;
+        publishState();
+    }
+
     public void scanMusic() {
+        if (!hasPermission()) { invalidate(); return; }
+        if (state == State.SCANNING) return;
+        long request = ++generation;
+        state = State.SCANNING;
+        publishState();
         scanExecutor.execute(() -> {
-            ArrayList<SongModel> result = queryMusic();
-            musics = result;
-            mainHandler.post(() -> {
-                ScanningListener callback = listener.get();
-                if (callback != null) {
-                    callback.onScanningMusicComplete(result);
-                }
-            });
+            try {
+                ArrayList<SongModel> result = queryMusic();
+                mainHandler.post(() -> {
+                    if (request != generation) return;
+                    if (!hasPermission()) { invalidate(); return; }
+                    musics = result;
+                    state = State.READY;
+                    ScanningListener callback = listener.get();
+                    if (callback != null) callback.onScanningMusicComplete(result);
+                    publishState();
+                });
+            } catch (RuntimeException error) {
+                Log.w("ScanningUtils", "Local media scan failed", error);
+                mainHandler.post(() -> {
+                    if (request != generation) return;
+                    state = error instanceof SecurityException || !hasPermission() ? State.UNAUTHORIZED : State.ERROR;
+                    if (state == State.UNAUTHORIZED) musics = null;
+                    publishState();
+                });
+            }
         });
+    }
+
+    private void publishState() {
+        ScanningListener callback = listener.get();
+        if (callback != null) callback.onScanStateChanged(getState());
     }
 
     private ArrayList<SongModel> queryMusic() {
@@ -87,11 +137,17 @@ public class ScanningUtils {
                 MediaStore.Audio.Media.IS_NOTIFICATION,
                 MediaStore.Audio.Media.DURATION,
                 MediaStore.Audio.Media.SIZE};
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            java.util.List<String> columns = new ArrayList<>(java.util.Arrays.asList(PROJECTIONS));
+            columns.add(MediaStore.MediaColumns.VOLUME_NAME);
+            columns.add(MediaStore.MediaColumns.RELATIVE_PATH);
+            PROJECTIONS = columns.toArray(new String[0]);
+        }
         ArrayList<SongModel> result = new ArrayList<>();
         try (Cursor cursor = contentResolver.query(
                 MEDIA_URI, PROJECTIONS, WHERE, VALUE, ORDER_BY)) {
             if (cursor == null) {
-                return result;
+                throw new IllegalStateException("MediaStore query returned no cursor");
             }
             while (cursor.moveToNext()) {
 
@@ -123,12 +179,14 @@ public class ScanningUtils {
                 //if (duration > 10 * 1000 && name.endsWith(".mp3")) {
                 SongModel music = new SongModel(artist, name, album, albumId, path, duration, size);
                 music.setFilePath(filePath);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    music.setVolumeName(cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.VOLUME_NAME)));
+                    music.setRelativePath(cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.RELATIVE_PATH)));
+                }
                 result.add(music);
                 //}
             }
 
-        } catch (Exception e) {
-            Log.e("ScanningUtils", "Unable to scan local music", e);
         }
         return result;
     }
@@ -139,7 +197,7 @@ public class ScanningUtils {
     }
 
     public ArrayList<SongModel> getMusic() {
-        return musics;
+        return hasPermission() ? musics : null;
     }
 
     public ScanningUtils setListener(ScanningListener listener) {
@@ -160,5 +218,7 @@ public class ScanningUtils {
          * @param music
          */
         void onScanningMusicComplete(ArrayList<SongModel> music);
+
+        default void onScanStateChanged(State state) { }
     }
 }

@@ -1,6 +1,6 @@
 package com.chao.peakmusic.model;
 
-import com.chao.peakmusic.base.ApiAddressManager;
+import com.chao.peakmusic.data.MusicSource;
 
 import android.os.Parcel;
 import android.os.Parcelable;
@@ -24,19 +24,41 @@ public class MusicModel implements Parcelable {
      * },
      */
 
-    private int id;
+    private String id;
+    private transient String sourceId;
+    private transient String sourceBaseUrl;
+    private transient String storedLibraryKey;
     private String name;
     private String singer;
     private String img;
     private String lrc;
     private String mp3;
 
-    public int getId() {
+    public String getId() {
         return id;
     }
 
     public void setId(int id) {
-        this.id = id;
+        this.id = String.valueOf(id);
+    }
+
+    public void setId(String id) { this.id = id; }
+
+    /** Capture the issuing API once. JSON cannot write these client-owned transient fields. */
+    public void bindApiSource(String baseUrl) {
+        if (sourceId != null) return;
+        sourceBaseUrl = MusicSource.normalize(baseUrl);
+        sourceId = MusicSource.apiId(sourceBaseUrl);
+    }
+
+    public String getSourceId() { return sourceId == null ? MusicSource.LEGACY : sourceId; }
+    public String getSourceBaseUrl() { return sourceBaseUrl; }
+    public String getStoredLibraryKey() { return storedLibraryKey; }
+
+    public void restoreLibrarySource(String sourceId, String baseUrl, String key) {
+        this.sourceId = sourceId == null ? MusicSource.LEGACY : sourceId;
+        sourceBaseUrl = baseUrl;
+        storedLibraryKey = key;
     }
 
     public String getName() {
@@ -80,7 +102,7 @@ public class MusicModel implements Parcelable {
     }
 
     private String resolveUrl(String value) {
-        HttpUrl baseUrl = HttpUrl.parse(ApiAddressManager.getBaseUrl());
+        HttpUrl baseUrl = sourceBaseUrl == null ? null : HttpUrl.parse(sourceBaseUrl);
         HttpUrl resolvedUrl = baseUrl == null || value == null ? null : baseUrl.resolve(value);
         return resolvedUrl == null ? value : resolvedUrl.toString();
     }
@@ -89,22 +111,28 @@ public class MusicModel implements Parcelable {
     }
 
     private MusicModel(Parcel in) {
-        id = in.readInt();
+        id = in.readString();
         name = in.readString();
         singer = in.readString();
         img = in.readString();
         lrc = in.readString();
         mp3 = in.readString();
+        sourceId = in.readString();
+        sourceBaseUrl = in.readString();
+        storedLibraryKey = in.readString();
     }
 
     @Override
     public void writeToParcel(Parcel dest, int flags) {
-        dest.writeInt(id);
+        dest.writeString(id);
         dest.writeString(name);
         dest.writeString(singer);
         dest.writeString(img);
         dest.writeString(lrc);
         dest.writeString(mp3);
+        dest.writeString(sourceId);
+        dest.writeString(sourceBaseUrl);
+        dest.writeString(storedLibraryKey);
     }
 
     @Override

@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item android:id="@+id/action_select_tracks" android:title="@string/select_tracks" app:showAsAction="ifRoom" />
+    <item android:id="@+id/action_select_all_tracks" android:title="@string/select_all_tracks" app:showAsAction="ifRoom" />
+    <item android:id="@+id/action_batch_favorite" android:title="@string/favorite_selected" app:showAsAction="never" />
+    <item android:id="@+id/action_batch_playlist" android:title="@string/add_selected_to_playlist" app:showAsAction="never" />
+    <item android:id="@+id/action_batch_remove" android:title="@string/remove_selected_from_playlist" app:showAsAction="never" />
+    <item android:id="@+id/action_cancel_selection" android:title="@string/cancel_selection" app:showAsAction="never" />
     <item
         android:id="@+id/action_new_playlist"
         android:title="@string/new_playlist"
@@ -13,4 +19,5 @@
         android:id="@+id/action_delete_playlist"
         android:title="@string/delete_playlist"
         app:showAsAction="ifRoom" />
+    <item android:id="@+id/action_rename_playlist" android:title="@string/rename_playlist" app:showAsAction="never" />
 </menu>

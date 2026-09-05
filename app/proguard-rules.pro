@@ -22,3 +22,6 @@
 # Gson reads API models reflectively.
 -keepclassmembers class com.chao.peakmusic.model.** { <fields>; }
 -keepattributes Signature,*Annotation*
+
+# Private staged and active queue JSON must survive Release obfuscation and app upgrades.
+-keepclassmembers class com.chao.peakmusic.data.MusicTrackEntity { <fields>; }

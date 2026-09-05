@@ -49,9 +49,10 @@
         <activity
             android:name=".activity.MusicPlayActivity"
             android:theme="@style/AppTheme.NoWindowBackground" />
-        <activity android:name=".activity.ApiLogActivity" />
+        <activity android:name=".activity.ApiLogActivity" android:theme="@style/AppTheme.Diagnostics" />
         <activity android:name=".activity.MusicLibraryActivity" />
         <activity android:name=".activity.MusicSearchActivity" />
+        <activity android:name=".activity.MusicQueueActivity" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

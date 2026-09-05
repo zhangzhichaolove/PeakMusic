@@ -1,14 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    >
+    android:orientation="vertical"
+    android:background="?android:attr/colorBackground">
 
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical">
+    <Spinner android:id="@+id/local_sections" android:layout_width="0dp"
+        android:layout_weight="1" android:layout_height="wrap_content" android:minHeight="48dp"
+        android:contentDescription="@string/local_browse_by" />
+    <Button android:id="@+id/local_refresh" android:layout_width="wrap_content"
+        android:layout_height="wrap_content" android:minHeight="48dp" android:text="@string/local_refresh" />
+    </LinearLayout>
+    <Button android:id="@+id/local_group_back" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:minHeight="48dp" android:maxLines="2"
+        android:ellipsize="end" android:visibility="gone" />
+    <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/local_music_list"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@color/white_alpha" />
+        android:background="?android:attr/colorBackground" />
 
     <TextView
         android:id="@+id/local_empty"
@@ -17,8 +30,9 @@
         android:gravity="center"
         android:padding="32dp"
         android:text="@string/local_music_empty"
-        android:textColor="@android:color/darker_gray"
+        android:textColor="?android:attr/textColorSecondary"
         android:textSize="16sp"
         android:visibility="gone" />
 
 </FrameLayout>
+</LinearLayout>

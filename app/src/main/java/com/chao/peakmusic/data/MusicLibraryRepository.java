@@ -10,12 +10,18 @@ import java.util.concurrent.Executors;
 
 public final class MusicLibraryRepository {
     private static volatile MusicLibraryRepository instance;
+    private final MusicDatabase database;
     private final MusicLibraryDao dao;
     private final ExecutorService databaseExecutor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     private MusicLibraryRepository(Context context) {
-        dao = MusicDatabase.get(context).libraryDao();
+        this(MusicDatabase.get(context));
+    }
+
+    MusicLibraryRepository(MusicDatabase database) {
+        this.database = database;
+        dao = database.libraryDao();
     }
 
     public static MusicLibraryRepository get(Context context) {
@@ -33,14 +39,14 @@ public final class MusicLibraryRepository {
         if (metadata == null || metadata.source.isEmpty()) {
             return;
         }
-        databaseExecutor.execute(() -> dao.saveTrack(mergeMetadata(metadata)));
+        databaseExecutor.execute(() -> database.runInTransaction(() -> dao.saveTrack(mergeMetadata(metadata))));
     }
 
     public void recordPlayback(String source, String name, String artist, boolean local) {
         if (source == null || source.isEmpty()) {
             return;
         }
-        databaseExecutor.execute(() -> {
+        databaseExecutor.execute(() -> database.runInTransaction(() -> {
             MusicTrackEntity metadata = new MusicTrackEntity();
             metadata.source = source;
             metadata.name = name;
@@ -50,7 +56,7 @@ public final class MusicLibraryRepository {
             track.lastPlayedAt = System.currentTimeMillis();
             track.playCount++;
             dao.saveTrack(track);
-        });
+        }));
     }
 
     public void toggleFavorite(MusicTrackEntity metadata, ValueCallback<Boolean> callback) {
@@ -59,11 +65,14 @@ public final class MusicLibraryRepository {
             return;
         }
         databaseExecutor.execute(() -> {
-            MusicTrackEntity track = mergeMetadata(metadata);
-            track.favorite = !track.favorite;
-            track.favoriteAt = track.favorite ? System.currentTimeMillis() : 0;
-            dao.saveTrack(track);
-            post(callback, track.favorite);
+            boolean favorite = database.runInTransaction(() -> {
+                MusicTrackEntity track = mergeMetadata(metadata);
+                track.favorite = !track.favorite;
+                track.favoriteAt = track.favorite ? System.currentTimeMillis() : 0;
+                dao.saveTrack(track);
+                return track.favorite;
+            });
+            post(callback, favorite);
         });
     }
 
@@ -87,11 +96,15 @@ public final class MusicLibraryRepository {
                 source == null ? null : dao.findTrack(source)));
     }
 
-    public void clearHistory(Runnable callback) {
+    public void clearHistory(ValueCallback<Boolean> callback) {
         databaseExecutor.execute(() -> {
-            dao.deleteUnreferencedHistory();
-            dao.clearReferencedHistory();
-            post(callback);
+            try {
+                database.runInTransaction(() -> {
+                    dao.deleteUnreferencedHistory();
+                    dao.clearReferencedHistory();
+                });
+                post(callback, true);
+            } catch (android.database.sqlite.SQLiteException error) { post(callback, false); }
         });
     }
 
@@ -118,19 +131,34 @@ public final class MusicLibraryRepository {
         databaseExecutor.execute(() -> post(callback, dao.playlistTracks(playlistId)));
     }
 
-    public void addToPlaylist(long playlistId, MusicTrackEntity metadata, Runnable callback) {
+    public void addToPlaylist(long playlistId, MusicTrackEntity metadata, ValueCallback<Boolean> callback) {
         if (metadata == null || metadata.source.isEmpty()) {
-            post(callback);
+            post(callback, false);
             return;
         }
         databaseExecutor.execute(() -> {
-            dao.saveTrack(mergeMetadata(metadata));
-            PlaylistTrackEntity track = new PlaylistTrackEntity();
-            track.playlistId = playlistId;
-            track.source = metadata.source;
-            track.addedAt = System.currentTimeMillis();
-            dao.addPlaylistTrack(track);
-            post(callback);
+            try {
+                boolean added = database.runInTransaction(() -> {
+                    if (dao.hasPlaylist(playlistId) == 0) return false;
+                    dao.saveTrack(mergeMetadata(metadata));
+                    PlaylistTrackEntity track = new PlaylistTrackEntity();
+                    track.playlistId = playlistId;
+                    track.source = metadata.source;
+                    track.addedAt = System.currentTimeMillis();
+                    dao.addPlaylistTrack(track);
+                    return true;
+                });
+                post(callback, added);
+            } catch (android.database.sqlite.SQLiteException error) { post(callback, false); }
+        });
+    }
+
+    public void renamePlaylist(long playlistId, String name, ValueCallback<Boolean> callback) {
+        String normalized = name == null ? "" : name.trim();
+        if (normalized.isEmpty()) { post(callback, false); return; }
+        databaseExecutor.execute(() -> {
+            try { post(callback, dao.renamePlaylist(playlistId, normalized) == 1); }
+            catch (android.database.sqlite.SQLiteException error) { post(callback, false); }
         });
     }
 
@@ -141,11 +169,70 @@ public final class MusicLibraryRepository {
         });
     }
 
-    public void deletePlaylist(long playlistId, Runnable callback) {
+    /** Batch actions target established keys, never stale UI metadata or playback URLs. */
+    public void setFavorites(List<String> keys, boolean favorite, ValueCallback<Boolean> callback) {
+        batch(keys, tracks -> {
+            long now = System.currentTimeMillis();
+            for (MusicTrackEntity track : tracks) {
+                track.favorite = favorite;
+                track.favoriteAt = favorite ? now : 0;
+                dao.saveTrack(track); // Upsert preserves every playlist association.
+            }
+            return true;
+        }, callback);
+    }
+
+    public void addTracksToPlaylist(long playlistId, List<String> keys, ValueCallback<Boolean> callback) {
+        batch(keys, tracks -> {
+            if (dao.hasPlaylist(playlistId) == 0) return false;
+            long now = System.currentTimeMillis();
+            for (MusicTrackEntity track : tracks) {
+                PlaylistTrackEntity member = new PlaylistTrackEntity();
+                member.playlistId = playlistId; member.source = track.source; member.addedAt = now;
+                dao.addPlaylistTrack(member);
+            }
+            return true;
+        }, callback);
+    }
+
+    public void removeTracksFromPlaylist(long playlistId, List<String> keys, ValueCallback<Boolean> callback) {
+        batch(keys, tracks -> {
+            if (dao.hasPlaylist(playlistId) == 0) return false;
+            for (MusicTrackEntity track : tracks) dao.removePlaylistTrack(playlistId, track.source);
+            return true; // Only membership is removed, not files, favorites or playback history.
+        }, callback);
+    }
+
+    private void batch(List<String> keys, BatchAction action, ValueCallback<Boolean> callback) {
+        java.util.Set<String> snapshot = keys == null ? java.util.Collections.emptySet() : new java.util.LinkedHashSet<>(keys);
+        if (snapshot.isEmpty() || snapshot.contains(null) || snapshot.contains("")) { post(callback, false); return; }
         databaseExecutor.execute(() -> {
-            dao.deletePlaylistTracks(playlistId);
-            dao.deletePlaylist(playlistId);
-            post(callback);
+            try {
+                boolean success = database.runInTransaction(() -> {
+                    java.util.ArrayList<MusicTrackEntity> tracks = new java.util.ArrayList<>();
+                    for (String key : snapshot) {
+                        MusicTrackEntity track = dao.findTrack(key);
+                        if (track == null) return false; // Validate the complete snapshot before any writes.
+                        tracks.add(track);
+                    }
+                    return action.apply(tracks);
+                });
+                post(callback, success);
+            } catch (android.database.sqlite.SQLiteException error) { post(callback, false); }
+        });
+    }
+
+    private interface BatchAction { boolean apply(List<MusicTrackEntity> tracks); }
+
+    public void deletePlaylist(long playlistId, ValueCallback<Boolean> callback) {
+        databaseExecutor.execute(() -> {
+            try {
+                database.runInTransaction(() -> {
+                    dao.deletePlaylistTracks(playlistId);
+                    dao.deletePlaylist(playlistId);
+                });
+                post(callback, true);
+            } catch (android.database.sqlite.SQLiteException error) { post(callback, false); }
         });
     }
 
@@ -153,6 +240,10 @@ public final class MusicLibraryRepository {
         MusicTrackEntity saved = dao.findTrack(source.source);
         if (saved == null) {
             return source;
+        }
+        if (source.playbackUrl != null) saved.playbackUrl = source.playbackUrl;
+        if (!MusicSource.LEGACY.equals(source.sourceId)) {
+            saved.sourceId = source.sourceId; saved.sourceBaseUrl = source.sourceBaseUrl; saved.mediaId = source.mediaId;
         }
         saved.name = prefer(source.name, saved.name);
         saved.artist = prefer(source.artist, saved.artist);

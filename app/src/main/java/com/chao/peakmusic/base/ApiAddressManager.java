@@ -24,6 +24,7 @@ public final class ApiAddressManager {
     private static final OkHttpClient TEST_CLIENT = new OkHttpClient.Builder()
             .connectTimeout(8, TimeUnit.SECONDS)
             .readTimeout(8, TimeUnit.SECONDS)
+            .callTimeout(12, TimeUnit.SECONDS)
             .build();
 
     private ApiAddressManager() {
@@ -57,30 +58,42 @@ public final class ApiAddressManager {
         if (url == null || !("http".equals(url.scheme()) || "https".equals(url.scheme()))) {
             return null;
         }
+        if (!url.username().isEmpty() || !url.password().isEmpty() || url.query() != null || url.fragment() != null) {
+            return null;
+        }
         return url.toString();
     }
 
-    public static void testConnection(String value, ConnectionCallback callback) {
-        Handler mainHandler = new Handler(Looper.getMainLooper());
+    static HttpUrl connectionUrl(String value) {
         String normalized = normalize(value);
-        if (normalized == null) {
-            callback.onResult(false, null);
-            return;
-        }
-        TEST_CLIENT.newCall(new Request.Builder().url(normalized).get().build())
-                .enqueue(new Callback() {
-                    @Override
-                    public void onFailure(Call call, IOException error) {
-                        mainHandler.post(() -> callback.onResult(false, error.getMessage()));
-                    }
+        return normalized == null ? null : HttpUrl.get(normalized).resolve("music/getMusicList?search=");
+    }
 
-                    @Override
-                    public void onResponse(Call call, Response response) {
-                        int code = response.code();
-                        response.close();
-                        mainHandler.post(() -> callback.onResult(true, "HTTP " + code));
-                    }
-                });
+    public static Call testConnection(String value, ConnectionCallback callback) {
+        Handler mainHandler = new Handler(Looper.getMainLooper());
+        HttpUrl endpoint = connectionUrl(value);
+        if (endpoint == null) {
+            callback.onResult(false, "API 地址无效");
+            return null;
+        }
+        Call request = TEST_CLIENT.newCall(new Request.Builder().url(endpoint).get().build());
+        request.enqueue(new Callback() {
+            private void deliver(boolean valid, String detail) {
+                mainHandler.post(() -> { if (!request.isCanceled()) callback.onResult(valid, detail); });
+            }
+            @Override public void onFailure(Call call, IOException error) {
+                deliver(false, "请求失败，请检查网络、地址或证书");
+            }
+            @Override public void onResponse(Call call, Response response) {
+                try (Response closeable = response) {
+                    String failure = ApiHealthCheck.failure(closeable);
+                    deliver(failure == null, failure == null ? "HTTP " + closeable.code() + " · 列表结构正确" : failure);
+                } catch (IOException error) {
+                    deliver(false, "读取接口响应失败");
+                }
+            }
+        });
+        return request;
     }
 
     public interface ConnectionCallback {

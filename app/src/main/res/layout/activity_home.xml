@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/bg_colorful"
+    android:background="?android:attr/colorBackground"
     android:orientation="vertical"
     tools:ignore="Overdraw">
 
@@ -19,7 +19,8 @@
         android:id="@+id/main_content"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@id/statusBarView">
+        android:layout_below="@id/statusBarView"
+        android:layout_above="@id/fl_play_bar">
 
         <com.google.android.material.appbar.AppBarLayout
             android:layout_width="match_parent"
@@ -46,11 +47,11 @@
                 android:stateListAnimator="@null"
                 app:tabBackground="@android:color/transparent"
                 app:tabGravity="fill"
-                app:tabIndicatorColor="@color/red"
+                app:tabIndicatorColor="@color/white"
                 app:tabIndicatorHeight="2dp"
                 app:tabMode="fixed"
                 app:tabRippleColor="@android:color/transparent"
-                app:tabSelectedTextColor="@color/red"
+                app:tabSelectedTextColor="@color/white"
                 app:tabTextColor="@color/white"></com.google.android.material.tabs.TabLayout>
 
         </com.google.android.material.appbar.AppBarLayout>
