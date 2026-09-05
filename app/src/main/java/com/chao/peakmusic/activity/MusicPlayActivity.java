@@ -32,12 +32,15 @@ import com.chao.peakmusic.ActivityCall;
 import com.chao.peakmusic.R;
 import com.chao.peakmusic.base.BaseActivity;
 import com.chao.peakmusic.model.MusicModel;
+import com.chao.peakmusic.model.SongModel;
 import com.chao.peakmusic.data.MusicLibraryRepository;
 import com.chao.peakmusic.data.MusicTrackEntity;
 import com.chao.peakmusic.service.MusicService;
 import com.chao.peakmusic.utils.ImageLoaderV4;
 import com.chao.peakmusic.utils.LyricsParser;
 import com.chao.peakmusic.utils.LyricsParser.LyricLine;
+import com.chao.peakmusic.utils.MusicDataUtils;
+import com.chao.peakmusic.utils.ScanningUtils;
 import com.chao.peakmusic.widget.MusicAlbumView;
 
 import java.io.IOException;
@@ -166,6 +169,7 @@ public class MusicPlayActivity extends BaseActivity {
         String name = music == null ? getIntent().getStringExtra(EXTRA_NAME) : music.getName();
         String singer = music == null ? getIntent().getStringExtra(EXTRA_SINGER) : music.getSinger();
         String image = music == null ? getIntent().getStringExtra(EXTRA_IMAGE) : music.getImg();
+        currentSource = music == null ? null : music.getMp3();
 
         displayTrack(name, singer, image, music == null ? null : music.getLrc());
 
@@ -230,7 +234,11 @@ public class MusicPlayActivity extends BaseActivity {
             @Override
             public void onFailure(Call call, IOException error) {
                 if (!call.isCanceled()) {
-                    runOnUiThread(() -> showLyricsMessage(getString(R.string.lyrics_empty)));
+                    runOnUiThread(() -> {
+                        if (call == lyricsCall) {
+                            showLyricsMessage(getString(R.string.lyrics_empty));
+                        }
+                    });
                 }
             }
 
@@ -243,6 +251,9 @@ public class MusicPlayActivity extends BaseActivity {
                 }
                 List<LyricLine> parsedLyrics = LyricsParser.parse(text);
                 runOnUiThread(() -> {
+                    if (call != lyricsCall || call.isCanceled()) {
+                        return;
+                    }
                     if (parsedLyrics.isEmpty()) {
                         showLyricsMessage(getString(R.string.lyrics_empty));
                     } else {
@@ -338,20 +349,55 @@ public class MusicPlayActivity extends BaseActivity {
 
         @Override
         public void trackChanged(String source, String name, String artist, boolean local) {
-            if (TextUtils.equals(source, currentSource)) {
-                return;
-            }
-            currentSource = source;
-            MusicLibraryRepository.get(MusicPlayActivity.this).loadTrack(source, track -> {
+            runOnUiThread(() -> updateTrack(source, name, artist, local));
+        }
+    };
+
+    private void updateTrack(String source, String name, String artist, boolean local) {
+        if (TextUtils.equals(source, currentSource)) {
+            return;
+        }
+        currentSource = source;
+        MusicTrackEntity loadedTrack = findLoadedTrack(source, local);
+        if (loadedTrack != null) {
+            displayTrack(name, artist, loadedTrack.imageUrl, loadedTrack.lyricsUrl);
+            return;
+        }
+        MusicLibraryRepository.get(this).loadTrack(source, track -> {
                 if (!TextUtils.equals(source, currentSource)) {
                     return;
                 }
                 displayTrack(name, artist,
                         track == null ? null : track.imageUrl,
                         track == null ? null : track.lyricsUrl);
-            });
+        });
+    }
+
+    private MusicTrackEntity findLoadedTrack(String source, boolean local) {
+        if (TextUtils.isEmpty(source)) {
+            return null;
         }
-    };
+        if (local) {
+            List<SongModel> localMusic = ScanningUtils.getInstance(this).getMusic();
+            if (localMusic != null) {
+                for (SongModel song : localMusic) {
+                    if (song != null && TextUtils.equals(source, song.getPath())) {
+                        return MusicTrackEntity.from(song);
+                    }
+                }
+            }
+            return null;
+        }
+        List<MusicModel> onlineMusic = MusicDataUtils.getInstance().getMusicList();
+        if (onlineMusic != null) {
+            for (MusicModel music : onlineMusic) {
+                if (music != null && TextUtils.equals(source, music.getMp3())) {
+                    return MusicTrackEntity.from(music);
+                }
+            }
+        }
+        return null;
+    }
 
     @Override
     protected void onStart() {
