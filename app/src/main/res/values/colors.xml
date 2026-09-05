@@ -12,4 +12,6 @@
     <color name="white_alpha">#EDFFFFFF</color>
     <color name="black">#000000</color>
     <color name="lyric_active">#FF4081</color>
+    <color name="navigation_drawer_background">#FFFFFF</color>
+    <color name="navigation_item_default">#DE000000</color>
 </resources>

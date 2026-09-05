@@ -15,9 +15,11 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_gravity="start"
+        android:background="@color/navigation_drawer_background"
         android:fitsSystemWindows="false"
         app:headerLayout="@layout/header_just_username"
-        app:itemIconTint="#f0f"
+        app:itemIconTint="@color/navigation_item_color"
+        app:itemTextColor="@color/navigation_item_color"
         app:menu="@menu/navigation_menu" />
 
 </androidx.drawerlayout.widget.DrawerLayout>
